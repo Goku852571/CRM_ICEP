@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/modules/auth/pages/loginpage.test.tsx","./src/modules/auth/pages/loginpage.tsx","./src/modules/users/pages/userlistpage.tsx","./src/modules/users/services/userservice.ts","./src/shared/hooks/useauth.tsx","./src/shared/layouts/applayout.tsx","./src/shared/services/api.ts"],"errors":true,"version":"5.9.3"}
