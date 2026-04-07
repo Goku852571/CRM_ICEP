@@ -18,6 +18,13 @@ class TicketController extends ApiController
             ->orderBy('priority', 'desc')
             ->orderBy('position', 'asc');
 
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_departamento')) {
+            $query->where(function($q) use($request) {
+                $q->where('requester_id', $request->user()->id)
+                  ->orWhere('assignee_id', $request->user()->id);
+            });
+        }
+
         if ($request->filled('area_id')) {
             $query->where('area_id', $request->area_id);
         }
@@ -77,13 +84,24 @@ class TicketController extends ApiController
         return $this->success($ticket->load(['area', 'requester', 'assignee']), 'Ticket creado exitosamente', 201);
     }
 
-    public function show(Ticket $ticket): JsonResponse
+    public function show(Request $request, Ticket $ticket): JsonResponse
     {
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_departamento')) {
+            if ($ticket->requester_id !== $request->user()->id && $ticket->assignee_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
         return $this->success($ticket->load(['area', 'requester', 'assignee', 'histories.user']));
     }
 
     public function update(Request $request, Ticket $ticket): JsonResponse
     {
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_departamento')) {
+            if ($ticket->requester_id !== $request->user()->id && $ticket->assignee_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
+
         $request->validate([
             'title' => 'string|max:255',
             'description' => 'string',
@@ -98,6 +116,12 @@ class TicketController extends ApiController
 
     public function updateStatus(Request $request, Ticket $ticket): JsonResponse
     {
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_departamento')) {
+            if ($ticket->requester_id !== $request->user()->id && $ticket->assignee_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
+
         $request->validate([
             'status' => 'required|in:open,in_progress,paused,closed,cancelled',
             'reason' => 'required|string',
@@ -134,6 +158,12 @@ class TicketController extends ApiController
     
     public function updatePriority(Request $request, Ticket $ticket): JsonResponse
     {
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_departamento')) {
+            if ($ticket->requester_id !== $request->user()->id && $ticket->assignee_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
+
         $request->validate([
             'priority' => 'required|in:normal,urgent,priority',
             'reason' => 'required|string',
@@ -154,8 +184,14 @@ class TicketController extends ApiController
         return $this->success($ticket, 'Prioridad actualizada');
     }
 
-    public function destroy(Ticket $ticket): JsonResponse
+    public function destroy(Request $request, Ticket $ticket): JsonResponse
     {
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_departamento')) {
+            if ($ticket->requester_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
+
         $ticket->delete();
         return $this->success(null, 'Ticket eliminado');
     }

@@ -4,6 +4,9 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  id_number?: string;
+  phone?: string;
+  avatar?: string;
   roles: Role[];
   permissions?: any[];
 }

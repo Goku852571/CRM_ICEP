@@ -5,6 +5,9 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  id_number?: string;
+  phone?: string;
+  avatar?: string;
   roles: { id: number; name: string }[];
 }
 
@@ -14,6 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (token: string, user: User, permissions: string[]) => void;
+  updateProfile: (data: any) => Promise<any>;
   logout: () => Promise<void>;
   hasRole: (role: string) => boolean;
   hasPermission: (permission: string) => boolean;
@@ -52,6 +56,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPermissions(userPermissions);
   };
 
+  const updateProfile = async (data: any) => {
+    let payload: any;
+    let headers = {};
+
+    // If there's an avatar file, we need FormData
+    if (data.avatar instanceof File) {
+      payload = new FormData();
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined && data[key] !== null) {
+          payload.append(key, data[key]);
+        }
+      });
+      // Laravel handles PUT with FormData better using _method
+      payload.append('_method', 'PUT');
+      headers = { 'Content-Type': 'multipart/form-data' };
+      
+      const response = await api.post('/auth/me', payload, { headers });
+      setUser(response.data.data.user);
+      setPermissions(response.data.data.permissions || []);
+      return response.data;
+    } else {
+      payload = data;
+      const response = await api.put('/auth/me', payload);
+      setUser(response.data.data.user);
+      setPermissions(response.data.data.permissions || []);
+      return response.data;
+    }
+  };
+
   const logout = async () => {
     try {
       await api.post('/auth/logout');
@@ -73,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, permissions, isAuthenticated: !!user, isLoading, login, logout, hasRole, hasPermission }}>
+    <AuthContext.Provider value={{ user, permissions, isAuthenticated: !!user, isLoading, login, updateProfile, logout, hasRole, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

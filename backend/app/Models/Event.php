@@ -15,11 +15,19 @@ class Event extends Model
         'start_date',
         'end_date',
         'color',
-        'user_id'
+        'user_id',
+        'image_path',
+        'icon',
+        'meeting_link',
     ];
 
     public function creator()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function participants()
+    {
+        return $this->belongsToMany(User::class, 'event_participants');
     }
 }

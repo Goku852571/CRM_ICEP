@@ -1,0 +1,13 @@
+{
+  "name": "crm-icep-root",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "dev:all": "concurrently \"php artisan serve --working-dir=backend\" \"npm run dev --prefix frontend\"",
+    "backend": "php artisan serve --working-dir=backend",
+    "frontend": "npm run dev --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

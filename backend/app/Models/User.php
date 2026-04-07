@@ -25,6 +25,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'id_number',
+        'phone',
+        'avatar',
     ];
 
     /**
@@ -49,4 +52,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * Get the leads assigned to this user (as an advisor).
+     */
+    public function leads()
+    {
+        return $this->hasMany(Lead::class, 'advisor_id');
+    }
 }
+

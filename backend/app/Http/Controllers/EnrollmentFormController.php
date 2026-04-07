@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Notifications\EnrollmentCompletedNotification;
+use App\Models\Lead;
 
 class EnrollmentFormController extends ApiController
 {
@@ -16,6 +17,10 @@ class EnrollmentFormController extends ApiController
     {
         $query = EnrollmentForm::with(['advisor', 'course'])
             ->orderBy('created_at', 'desc');
+
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_asesores')) {
+            $query->where('advisor_id', $request->user()->id);
+        }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -37,9 +42,14 @@ class EnrollmentFormController extends ApiController
             'student_phone' => 'nullable|string',
         ]);
 
+        $advisorId = $request->advisor_id;
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_asesores')) {
+            $advisorId = $request->user()->id;
+        }
+
         $enrollment = EnrollmentForm::create([
             'uuid' => (string) Str::uuid(),
-            'advisor_id' => $request->advisor_id,
+            'advisor_id' => $advisorId,
             'course_id' => $request->course_id,
             'student_name' => $request->student_name,
             'student_email' => $request->student_email,
@@ -58,20 +68,32 @@ class EnrollmentFormController extends ApiController
         return $this->success($enrollment->load(['advisor', 'course']), 'Formulario creado', 201);
     }
 
-    public function show($id): JsonResponse
+    public function show(Request $request, $id): JsonResponse
     {
         $enrollment = EnrollmentForm::with(['advisor', 'course', 'histories.user'])->findOrFail($id);
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_asesores')) {
+            if ($enrollment->advisor_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
         return $this->success($enrollment);
     }
 
     public function updateStatus(Request $request, $id): JsonResponse
     {
+        $enrollment = EnrollmentForm::findOrFail($id);
+        
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_asesores')) {
+            if ($enrollment->advisor_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
+
         $request->validate([
             'status' => 'required|in:pending_send,sent,completed,in_review,approved,incomplete,void',
             'notes' => 'nullable|string'
         ]);
 
-        $enrollment = EnrollmentForm::findOrFail($id);
         $oldStatus = $enrollment->status;
         $enrollment->update([
             'status' => $request->status,
@@ -79,6 +101,17 @@ class EnrollmentFormController extends ApiController
             'completed_at' => $request->status === 'completed' && !$enrollment->completed_at ? now() : $enrollment->completed_at,
             'reviewed_at' => ($request->status === 'approved' || $request->status === 'in_review') && !$enrollment->reviewed_at ? now() : $enrollment->reviewed_at,
         ]);
+
+        // Si se completa la matrícula por asesor
+        if ($request->status === 'completed') {
+            $lead = Lead::where('email', $enrollment->student_email)
+                ->orWhere('phone', $enrollment->student_phone)
+                ->first();
+            
+            if ($lead && empty($lead->student_id)) {
+                $lead->update(['student_id' => Lead::generateIcepId()]);
+            }
+        }
 
         EnrollmentFormHistory::create([
             'enrollment_form_id' => $enrollment->id,
@@ -92,9 +125,19 @@ class EnrollmentFormController extends ApiController
         return $this->success($enrollment, 'Estado actualizado');
     }
 
-    public function destroy($id): JsonResponse
+    public function destroy(Request $request, $id): JsonResponse
     {
         $enrollment = EnrollmentForm::findOrFail($id);
+
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_asesores')) {
+            if ($enrollment->advisor_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+            if (!in_array($enrollment->status, ['pending_send', 'sent'])) {
+                return response()->json(['message' => 'No se puede eliminar un formulario que ya fue llenado/procesado'], 403);
+            }
+        }
+
         $enrollment->delete();
         return $this->success(null, 'Formulario anulado (soft-delete)');
     }
@@ -143,7 +186,47 @@ class EnrollmentFormController extends ApiController
             'notes' => 'El estudiante completó la información',
         ]);
 
+        // ==========================================
+        // CIERRE AUTOMÁTICO DEL LEAD EN EL CRM
+        // Cuando el estudiante termina el formulario, el lead pasa a closed_won
+        // Buscamos por los datos originales del enrollment (más precisos)
+        // ==========================================
+        $searchEmail = $enrollment->student_email ?? $request->student_email;
+        $searchPhone = $enrollment->student_phone ?? $request->student_phone;
+
+        $lead = \App\Models\Lead::where(function ($q) use ($searchEmail, $searchPhone) {
+                if ($searchEmail) $q->where('email', $searchEmail);
+                if ($searchPhone) $q->orWhere('phone', $searchPhone);
+            })
+            ->where('advisor_id', $enrollment->advisor_id) // Mismo asesor para evitar falsos positivos
+            ->first();
+
+        if ($lead) {
+            // Update existing lead since they enrolled
+            $lead->update([
+                'name' => $request->student_name,
+                'id_number' => $request->student_id_number,
+                'city' => $request->student_city,
+                'status' => 'closed_won' // Movido automáticamente a venta cerrada
+            ]);
+            
+            // Generar ID de estudiante solo al completar la matrícula
+            if (empty($lead->student_id)) {
+                $lead->update(['student_id' => Lead::generateIcepId()]);
+            }
+            
+            \App\Models\LeadInteraction::create([
+                'lead_id' => $lead->id,
+                'user_id' => $enrollment->advisor_id,
+                'type' => 'email', // Or web form
+                'result' => 'sold',
+                'notes' => 'El cliente llenó su matrícula y finalizó el proceso de compra. Curso: ' . ($enrollment->course->name ?? 'N/A'),
+                'interacted_at' => now(),
+            ]);
+        }
+
         $advisor = User::find($enrollment->advisor_id);
+
         if ($advisor) {
             $advisor->notify(new EnrollmentCompletedNotification($enrollment));
         }

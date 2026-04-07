@@ -27,6 +27,7 @@ export interface CourseQuestion {
 export interface Course {
     id: number;
     name: string;
+    code?: string;
     description: string | null;
     cover_image: string | null;
     price: number;
@@ -100,6 +101,11 @@ export const answerQuestion = async (courseId: number, questionId: number, answe
 
 export const getCoursesForEnrollment = async () => {
     const response = await api.get('/courses/for-enrollment');
+    return response.data;
+};
+
+export const updateCourseStatus = async (id: number, status: string) => {
+    const response = await api.patch(`/courses/${id}`, { status });
     return response.data;
 };
 

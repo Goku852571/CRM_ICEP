@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bell, Check, BellDot, Ticket, FileText, Calendar as CalendarIcon, Info } from 'lucide-react';
+import { Bell, Check, BellDot, Ticket, FileText, Calendar as CalendarIcon, Info, Sparkles } from 'lucide-react';
 import { useNotifications, Notification } from '../hooks/useNotifications';
 import { useNavigate } from 'react-router-dom';
 
@@ -53,82 +53,126 @@ export default function NotificationBell() {
     <div className="relative" ref={containerRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors focus:outline-none"
+        className={`relative p-2.5 rounded-xl transition-all duration-300 focus:outline-none active:scale-95 ${
+          isOpen ? 'bg-surface-container-low text-primary' : 'text-on-surface-variant/60 hover:bg-surface-container-low hover:text-primary'
+        }`}
       >
         {unreadCount > 0 ? (
           <div className="relative">
-            <Bell size={22} className="text-gray-700 animate-[wiggle_1s_ease-in-out_infinite]" />
-            <div className="absolute top-0 right-0 h-2.5 w-2.5 bg-red-400 rounded-full animate-ping opacity-75"></div>
-            <div className="absolute top-0 right-0 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white"></div>
+            <Bell size={20} className="animate-[wiggle_1s_ease-in-out_infinite]" />
+            <div className="absolute -top-1 -right-1 h-4 w-4 bg-tertiary-fixed text-on-tertiary-fixed rounded-full border-2 border-surface flex items-center justify-center text-[8px] font-black shadow-sm">
+              {unreadCount}
+            </div>
           </div>
         ) : (
-          <Bell size={22} />
+          <Bell size={20} />
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-            <h3 className="font-bold text-gray-900 font-primary flex items-center gap-2">
-              <BellDot size={18} className="text-blue-600" /> Notificaciones
-            </h3>
+        <div className="absolute right-0 mt-4 w-[400px] bg-surface-container-lowest rounded-3xl shadow-2xl shadow-primary/10 ghost-border overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-300 origin-top-right">
+          <div className="p-6 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-low/30">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary rounded-xl text-tertiary-fixed shadow-lg shadow-primary/20">
+                <BellDot size={18} />
+              </div>
+              <div>
+                <h3 className="font-headline font-extrabold text-primary text-sm uppercase tracking-tight">Centro de Alertas</h3>
+                <p className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest whitespace-nowrap">
+                  {unreadCount} Notificaciones sin leer
+                </p>
+              </div>
+            </div>
             {unreadCount > 0 && (
               <button 
                 onClick={(e) => { e.stopPropagation(); markAllAsRead(); }}
-                className="text-xs text-blue-600 font-bold hover:bg-blue-50 px-2 py-1 rounded transition"
+                className="text-[10px] font-black uppercase tracking-widest text-on-primary-container hover:underline underline-offset-8 transition-all"
               >
-                Marcar todas
+                Limpiar Todo
               </button>
             )}
           </div>
           
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-[500px] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-outline-variant/20 scrollbar-track-transparent">
             {notifications.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">
-                <p className="text-sm">No tienes notificaciones recientes</p>
+              <div className="p-12 text-center flex flex-col items-center">
+                <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center mb-4 opacity-40">
+                  <Sparkles size={32} className="text-on-surface-variant" />
+                </div>
+                <h4 className="font-headline font-bold text-primary text-lg mb-1">Todo al día</h4>
+                <p className="text-xs text-on-surface-variant opacity-60">No tienes alertas pendientes en este momento.</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-outline-variant/5">
                 {notifications.map((notification: Notification) => {
                   const Icon = IconMap[notification.data.type] || IconMap.default;
+                  const isRead = !!notification.read_at;
+                  
                   return (
                     <div 
                       key={notification.id} 
                       onClick={() => handleNotificationClick(notification)}
-                      className={`p-4 transition-all relative flex gap-3 cursor-pointer group/item ${!notification.read_at ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'}`}
+                      className={`p-5 transition-all relative flex gap-4 cursor-pointer group hover:bg-surface-container-low/50 ${!isRead ? 'bg-primary/[0.02]' : ''}`}
                     >
-                      {!notification.read_at && (
-                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-                      )}
-                      
-                      <div className={`p-2 rounded-xl self-start ${!notification.read_at ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-                        <Icon size={18} />
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-105 ${
+                        !isRead 
+                          ? 'primary-gradient text-white shadow-lg shadow-primary/20' 
+                          : 'bg-surface-container-high text-on-surface-variant/40'
+                      }`}>
+                        <Icon size={20} />
                       </div>
 
-                      <div className="flex-1">
-                        <p className={`text-sm font-bold leading-tight mb-0.5 ${!notification.read_at ? 'text-gray-900' : 'text-gray-500'}`}>
-                          {notification.data.title}
+                      <div className="flex-1 min-w-0 pr-6">
+                        <div className="flex justify-between items-start mb-1.5">
+                          <p className={`text-sm font-bold tracking-tight truncate leading-tight ${!isRead ? 'text-primary' : 'text-on-surface-variant opacity-60'}`}>
+                            {notification.data.title}
+                          </p>
+                          {!isRead && (
+                            <div className="w-2 h-2 rounded-full bg-tertiary-fixed flex-shrink-0 ml-2 shadow-[0_0_8px_rgba(111,251,190,0.8)]" />
+                          )}
+                        </div>
+                        <p className={`text-xs leading-relaxed line-clamp-2 ${!isRead ? 'text-on-surface-variant font-medium' : 'text-on-surface-variant/40 italic'}`}>
+                          {notification.data.message}
                         </p>
-                        <p className="text-sm text-gray-600 line-clamp-2 leading-snug">{notification.data.message}</p>
-                        <span className="text-[10px] text-gray-400 font-medium mt-2 block lowercase">
-                          {new Date(notification.created_at).toLocaleString()}
-                        </span>
+                        <div className="flex items-center gap-3 mt-3">
+                          <span className="text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/40">
+                            {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-[10px] font-bold text-on-primary-container/40 uppercase tracking-tighter">
+                            #NOTIF-{notification.id.toString().slice(-4)}
+                          </span>
+                        </div>
                       </div>
 
-                      {!notification.read_at && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }}
-                          className="text-blue-600 p-1.5 hover:bg-blue-100 rounded-lg self-center transition opacity-0 group-hover/item:opacity-100"
-                          title="Marcar como leída"
-                        >
-                          <Check size={16} />
-                        </button>
-                      )}
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 translate-x-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                        {!isRead ? (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }}
+                            className="p-2 bg-white rounded-xl shadow-lg border border-outline-variant/10 text-primary hover:bg-primary hover:text-white transition-colors"
+                            title="Marcar como leída"
+                          >
+                            <Check size={16} />
+                          </button>
+                        ) : (
+                           <div className="p-2 text-on-surface-variant/20">
+                             <Check size={16} />
+                           </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
               </div>
             )}
+          </div>
+          
+          <div className="p-4 bg-surface-container-low/50 border-t border-outline-variant/10 text-center">
+            <button 
+              onClick={() => { setIsOpen(false); navigate('/notifications'); }}
+              className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 hover:text-primary transition-colors"
+            >
+              Ver Informe de Actividad Completo
+            </button>
           </div>
         </div>
       )}

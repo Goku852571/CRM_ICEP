@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getTickets, getAreas, Ticket, Area } from '../services/ticketService';
-import { Plus, Filter, MoreVertical, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Filter, MoreVertical, Clock, AlertCircle, TrendingUp, Activity, Zap, Ticket as TicketIcon, CheckCircle2 } from 'lucide-react';
 import TicketFormModal from '../components/TicketFormModal';
 import TicketDetailModal from '../components/TicketDetailModal';
 import { useAuth } from '@/shared/hooks/useAuth';
@@ -68,59 +68,102 @@ export default function TicketListPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-primary">Módulo de Tickets</h1>
-          <p className="text-sm text-gray-500">Gestión y atención de tickets internos</p>
+    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 h-full flex flex-col">
+      
+      {/* Hero Header Section */}
+      <div className="max-w-4xl">
+        <h1 className="font-headline font-extrabold text-primary text-4xl md:text-5xl lg:text-6xl mb-3 tracking-tight leading-[1.1]">
+          Centro de Soporte
+        </h1>
+        <p className="text-on-surface-variant font-body text-base md:text-lg leading-relaxed opacity-80">
+          Gestión inteligente de incidencias, requerimientos y atención de tickets internos ICEP.
+        </p>
+      </div>
+
+      {/* Stats Bento Grid - Dashboard Style */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: 'Tickets Totales', val: tickets.length, icon: TicketIcon, color: 'text-primary', bg: 'bg-primary/5' },
+          { label: 'Abiertos / Pendientes', val: tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length, icon: Activity, color: 'text-on-primary-container', bg: 'bg-secondary-container' },
+          { label: 'Resueltos Hoy', val: tickets.filter(t => t.status === 'closed').length, icon: CheckCircle2, color: 'text-tertiary-fixed-dim', bg: 'bg-tertiary-fixed/5' },
+          { label: 'Promedio de Respuesta', val: '1.2h', icon: Zap, color: 'text-error', bg: 'bg-error/5' },
+        ].map((item, idx) => (
+          <div 
+            key={idx} 
+            className="bg-surface-container-lowest rounded-2xl p-6 ghost-border flex flex-col justify-between h-44 group hover:bg-white hover:shadow-xl hover:shadow-primary/5 transition-all duration-300"
+          >
+            <div className="flex justify-between items-start">
+              <div className={`p-3 rounded-xl ${item.bg} group-hover:bg-primary group-hover:text-white transition-colors duration-300`}>
+                <item.icon size={22} className={item.color} />
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/40 block mb-1">
+                  {item.label}
+                </span>
+                <div className="text-3xl font-headline font-black text-primary tabular-nums">
+                  {item.val}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-end justify-between">
+              <div className="flex gap-1 items-end h-8">
+                {[3, 5, 4, 7, 6].map((h, i) => (
+                  <div 
+                    key={i} 
+                    className={`w-1.5 rounded-full transition-all duration-500 ${idx % 2 === 0 ? 'bg-primary/40' : 'bg-primary/60'}`} 
+                    style={{ height: `${h * 4}px`, transitionDelay: `${idx * 50}ms` }}
+                  />
+                ))}
+              </div>
+              <div className={`text-[10px] font-black flex items-center px-3 py-1 rounded-full bg-surface-container-low text-primary`}>
+                <TrendingUp size={12} className="mr-1" />
+                +14%
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 pt-4">
+        {/* Filters */}
+        <div className="bg-surface-container-low p-2 rounded-2xl border border-outline-variant/10 flex gap-2 flex-wrap items-center">
+          <div className="flex items-center gap-2 text-on-surface-variant/60 font-black text-[10px] uppercase tracking-widest px-4">
+            <Filter size={16} /> Filtros:
+          </div>
+          <select 
+            className="bg-white border-none rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-primary/5 min-w-[150px]"
+            value={filters.status}
+            onChange={(e) => setFilters(prev => ({...prev, status: e.target.value}))}
+          >
+            <option value="">Todos los Estados</option>
+            <option value="open">Abierto</option>
+            <option value="in_progress">En Progreso</option>
+            <option value="paused">Pausado</option>
+            <option value="closed">Cerrado</option>
+          </select>
+          
+          <select 
+            className="bg-white border-none rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-primary/5 min-w-[150px]"
+            value={filters.priority}
+            onChange={(e) => setFilters(prev => ({...prev, priority: e.target.value}))}
+          >
+            <option value="">Todas las Prioridades</option>
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgente</option>
+            <option value="priority">Alta Prioridad</option>
+          </select>
         </div>
+
         {hasPermission('tickets.create') && (
           <button 
             onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition shadow-sm font-medium"
+            className="flex items-center gap-2 bg-primary text-white px-8 py-5 rounded-2xl hover:scale-105 active:scale-95 transition shadow-2xl shadow-primary/20 font-black text-xs uppercase tracking-widest"
           >
-            <Plus size={18} />
+            <Plus size={20} strokeWidth={3} />
             Nuevo Ticket
           </button>
         )}
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex gap-4 flex-wrap">
-        <div className="flex items-center gap-2 text-gray-500 font-medium text-sm">
-          <Filter size={18} /> Filtros:
-        </div>
-        <select 
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-          value={filters.status}
-          onChange={(e) => setFilters(prev => ({...prev, status: e.target.value}))}
-        >
-          <option value="">Todos los Estados</option>
-          <option value="open">Abierto</option>
-          <option value="in_progress">En Progreso</option>
-          <option value="paused">Pausado</option>
-          <option value="closed">Cerrado</option>
-        </select>
-        
-        <select 
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-          value={filters.priority}
-          onChange={(e) => setFilters(prev => ({...prev, priority: e.target.value}))}
-        >
-          <option value="">Todas las Prioridades</option>
-          <option value="normal">Normal</option>
-          <option value="urgent">Urgente</option>
-          <option value="priority">Alta Prioridad</option>
-        </select>
-        
-        <select 
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-          value={filters.area_id}
-          onChange={(e) => setFilters(prev => ({...prev, area_id: e.target.value}))}
-        >
-          <option value="">Todas las Áreas</option>
-          {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
       </div>
 
       {/* Kanban / Task Board */}

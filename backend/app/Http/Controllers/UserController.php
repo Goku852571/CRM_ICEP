@@ -40,12 +40,18 @@ class UserController extends ApiController
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:4',
             'roles' => 'required|array',
+            'id_number' => 'nullable|string|max:50',
+            'phone' => 'nullable|string|max:50',
+            'avatar' => 'nullable|string|max:255',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'id_number' => $request->id_number,
+            'phone' => $request->phone,
+            'avatar' => $request->avatar,
         ]);
 
         if ($request->has('roles')) {
@@ -73,9 +79,12 @@ class UserController extends ApiController
             'email' => 'string|email|max:255|unique:users,email,'.$user->id,
             'password' => 'nullable|string|min:4',
             'roles' => 'array',
+            'id_number' => 'nullable|string|max:50',
+            'phone' => 'nullable|string|max:50',
+            'avatar' => 'nullable|string|max:255',
         ]);
 
-        $user->update($request->only('name', 'email'));
+        $user->update($request->only('name', 'email', 'id_number', 'phone', 'avatar'));
 
         if ($request->filled('password')) {
             $user->update(['password' => Hash::make($request->password)]);

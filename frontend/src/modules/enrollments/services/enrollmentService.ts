@@ -16,13 +16,14 @@ export interface EnrollmentForm {
   completed_at: string | null;
   reviewed_at: string | null;
   advisor?: { id: number; name: string };
-  course?: { id: number; name: string };
+  course?: { id: number; name: string; code?: string };
   histories?: any[];
 }
 
 export interface Course {
   id: number;
   name: string;
+  code?: string;
 }
 
 export const getEnrollments = async (filters: any = {}) => {

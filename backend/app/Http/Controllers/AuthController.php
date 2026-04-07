@@ -48,6 +48,41 @@ class AuthController extends ApiController
     }
 
     /**
+     * Update the authenticated user's profile.
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        $request->validate([
+            'name' => 'string|max:255',
+            'email' => 'string|email|max:255|unique:users,email,'.$user->id,
+            'password' => 'nullable|string|min:4',
+            'id_number' => 'nullable|string|max:50',
+            'phone' => 'nullable|string|max:50',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        $data = $request->only('name', 'email', 'id_number', 'phone');
+
+        if ($request->hasFile('avatar')) {
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $data['avatar'] = \Illuminate\Support\Facades\Storage::url($path);
+        }
+
+        $user->update($data);
+
+        if ($request->filled('password')) {
+            $user->update(['password' => \Illuminate\Support\Facades\Hash::make($request->password)]);
+        }
+
+        return $this->success([
+            'user' => $user->load('roles'),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+        ], 'Perfil actualizado correctamente');
+    }
+
+    /**
      * Log the user out (Invalidate the token).
      */
     public function logout(Request $request): JsonResponse

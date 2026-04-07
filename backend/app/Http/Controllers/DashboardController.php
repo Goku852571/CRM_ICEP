@@ -15,42 +15,42 @@ class DashboardController extends ApiController
         $user = $request->user();
         
         // Dynamic stats by role
-        $data = [
-            'overview' => [
-                [
-                    'label' => 'Personal Total',
-                    'value' => User::count(),
-                    'icon' => 'Users',
-                    'color' => 'blue'
-                ],
-                [
-                    'label' => 'Roles Activos',
-                    'value' => Role::count(),
-                    'icon' => 'Shield',
-                    'color' => 'purple'
-                ],
-                [
-                    'label' => 'Permisos Sistema',
-                    'value' => Permission::count(),
-                    'icon' => 'Key',
-                    'color' => 'orange'
-                ],
-                [
-                    'label' => 'Tickets Abiertos',
-                    'value' => 0, // Mock for Sprint 2/3
-                    'icon' => 'Ticket',
-                    'color' => 'green'
-                ],
-            ],
-            'recent_activity' => User::with('roles')->latest()->take(5)->get()->map(function($user) {
+        if ($user->hasRole('admin') || $user->hasRole('jefe')) {
+            $overview = [
+                ['label' => 'Personal Total', 'value' => User::count(), 'icon' => 'Users', 'color' => 'blue'],
+                ['label' => 'Roles Activos', 'value' => Role::count(), 'icon' => 'Shield', 'color' => 'purple'],
+                ['label' => 'Permisos Sistema', 'value' => Permission::count(), 'icon' => 'Key', 'color' => 'orange'],
+                ['label' => 'Tickets Abiertos', 'value' => \App\Models\Ticket::where('status', 'open')->count(), 'icon' => 'Ticket', 'color' => 'green'],
+            ];
+            $recent_activity = User::with('roles')->latest()->take(5)->get()->map(function($u) {
                 return [
-                    'id' => $user->id,
-                    'user' => $user->name,
+                    'id' => $u->id,
+                    'user' => $u->name,
                     'action' => 'Se unió al equipo',
-                    'time' => $user->created_at->diffForHumans(),
-                    'roles' => $user->roles->pluck('name'),
+                    'time' => $u->created_at->diffForHumans(),
+                    'roles' => $u->roles->pluck('name'),
                 ];
-            }),
+            });
+        } else {
+            $overview = [
+                ['label' => 'Mis Leads', 'value' => \App\Models\Lead::where('advisor_id', $user->id)->count(), 'icon' => 'Users', 'color' => 'blue'],
+                ['label' => 'Mis Tickets', 'value' => \App\Models\Ticket::where('requester_id', $user->id)->orWhere('assignee_id', $user->id)->count(), 'icon' => 'Ticket', 'color' => 'green'],
+                ['label' => 'Mis Matrículas', 'value' => \App\Models\EnrollmentForm::where('advisor_id', $user->id)->count(), 'icon' => 'FileText', 'color' => 'purple'],
+            ];
+            $recent_activity = \App\Models\LeadInteraction::with('lead')->where('user_id', $user->id)->latest()->take(5)->get()->map(function($interaction) {
+                return [
+                    'id' => $interaction->id,
+                    'user' => $interaction->lead->name ?? 'Lead eliminado',
+                    'action' => 'Interacción: ' . $interaction->type,
+                    'time' => $interaction->created_at->diffForHumans(),
+                    'roles' => ['Lead'],
+                ];
+            });
+        }
+
+        $data = [
+            'overview' => $overview,
+            'recent_activity' => $recent_activity,
             'chart_data' => [
                 ['name' => 'Lun', 'tickets' => 12, 'enrollments' => 5],
                 ['name' => 'Mar', 'tickets' => 19, 'enrollments' => 8],

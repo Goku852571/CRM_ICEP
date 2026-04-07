@@ -1,7 +1,29 @@
 import { useState, useEffect } from 'react';
 import { getCourse, addAttachment, deleteAttachment, askQuestion, answerQuestion, Course, STATUS_MAP } from '../services/courseService';
 import { useAuth } from '@/shared/hooks/useAuth';
-import { X, Paperclip, Link2, Trash2, Send, MessageSquare, Loader2, BookOpen, DollarSign, CalendarDays, Pencil, Plus, ExternalLink, Download, ChevronDown } from 'lucide-react';
+import { 
+  X, 
+  Paperclip, 
+  Link2, 
+  Trash2, 
+  Send, 
+  MessageSquare, 
+  Loader2, 
+  BookOpen, 
+  DollarSign, 
+  CalendarDays, 
+  Pencil, 
+  Plus, 
+  ExternalLink, 
+  Download, 
+  ChevronDown,
+  Info,
+  Layers,
+  Sparkles,
+  ArrowRight,
+  FileText,
+  HelpCircle
+} from 'lucide-react';
 import { showSuccess, showError, showConfirmDanger, showToast } from '@/shared/utils/alerts';
 
 interface Props {
@@ -103,259 +125,364 @@ export default function CourseDetailModal({ courseId, isJefe, canEdit, onClose, 
 
     if (loading || !course) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="bg-white rounded-2xl p-12 flex items-center gap-3">
-                    <Loader2 size={24} className="animate-spin text-blue-600" />
-                    <span className="text-gray-600 font-medium">Cargando curso...</span>
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-surface/80 backdrop-blur-xl">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                    <span className="text-on-surface-variant font-bold text-xs uppercase tracking-widest opacity-60">Consultando Registro...</span>
                 </div>
             </div>
         );
     }
 
-    const status = STATUS_MAP[course.status];
+    const status = STATUS_MAP[course.status] || { label: 'Inactivo', color: 'bg-surface-container-high text-on-surface-variant' };
     const coverUrl = course.cover_image ? `/storage/${course.cover_image}` : null;
 
-    const tabClass = (tab: string) =>
-        `py-2 px-4 text-sm font-bold border-b-2 transition ${activeTab === tab ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`;
-
+    const navItemClass = (tab: string) =>
+        `flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 relative ${
+            activeTab === tab 
+            ? 'text-primary' 
+            : 'text-on-surface-variant/40 hover:text-on-surface-variant hover:bg-surface-container-low/30'
+        }`;
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
-                {/* Cover Banner */}
-                <div className="relative shrink-0">
-                    <div className="aspect-video sm:h-48 bg-gradient-to-br from-blue-600 to-indigo-700 overflow-hidden">
-                        {coverUrl
-                            ? <img src={coverUrl} alt={course.name} className="w-full h-full object-cover opacity-80" />
-                            : <div className="flex items-center justify-center h-full"><BookOpen size={64} className="text-white/30" /></div>
-                        }
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/20 backdrop-blur-sm p-4 animate-in fade-in duration-500">
+            <div className="bg-surface-container-lowest rounded-[2.5rem] w-full max-w-[1000px] shadow-2xl shadow-black/20 overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[700px] ghost-border scale-in-center duration-500 relative">
+                
+                {/* Global Close Button */}
+                <button 
+                  onClick={onClose} 
+                  className="absolute top-6 right-6 z-50 p-3 bg-white/80 backdrop-blur shadow-xl border border-outline-variant/10 text-on-surface-variant hover:text-primary rounded-2xl transition-all active:scale-95 group"
+                >
+                    <X size={20} className="group-hover:rotate-90 transition-transform" />
+                </button>
+                
+                {/* Left Side: Art & Title Banner */}
+                <div className="md:w-2/5 relative shrink-0 overflow-hidden group">
+                    <div className="absolute inset-0 primary-gradient transition-all duration-1000 group-hover:scale-110">
+                        {coverUrl ? (
+                            <img src={coverUrl} alt={course.name} className="w-full h-full object-cover opacity-60 mix-blend-overlay" />
+                        ) : (
+                            <div className="flex items-center justify-center h-full opacity-20"><BookOpen size={120} /></div>
+                        )}
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-5 flex justify-between items-end">
-                        <div>
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${status.color}`}>{status.label}</span>
-                            <h1 className="text-white text-xl font-bold mt-1 leading-tight">{course.name}</h1>
-                            {course.area && <p className="text-white/70 text-xs mt-0.5">{course.area.name}</p>}
+                    <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/20 to-transparent" />
+                    
+                    <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col justify-end">
+                        <div className="status-jewel mb-6 w-fit bg-white/10 backdrop-blur-xl text-white border-white/10">
+                            <div className={`status-dot ${course.status === 'active' ? 'bg-tertiary-fixed' : 'bg-error'}`} />
+                            <span className="text-[10px] font-bold tracking-widest">{status.label}</span>
                         </div>
-                        <div className="flex gap-2">
+                        <h1 className="font-headline font-extrabold text-white text-4xl lg:text-5xl tracking-tight leading-tight mb-4 group-hover:translate-x-1 transition-transform">
+                            {course.name}
+                        </h1>
+                        <p className="text-white/60 font-medium text-xs uppercase tracking-[0.15em] mb-8">
+                            REF: {course.code || 'EDU-BASE-001'} • {course.area?.name || 'Área General'}
+                        </p>
+                        
+                        <div className="flex gap-4">
                             {canEdit && (
-                                <button onClick={() => onEdit(course)} className="p-2 bg-white/20 backdrop-blur text-white rounded-xl hover:bg-white/30 transition" title="Editar">
-                                    <Pencil size={16} />
+                                <button 
+                                  onClick={() => onEdit(course)} 
+                                  className="flex-1 py-4 bg-tertiary-fixed text-on-tertiary-fixed rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-white hover:text-primary transition-all active:scale-95 shadow-lg shadow-black/10"
+                                >
+                                    <Pencil size={14} /> Editar Curso
                                 </button>
                             )}
-                            <button onClick={onClose} className="p-2 bg-white/20 backdrop-blur text-white rounded-xl hover:bg-white/30 transition">
-                                <X size={18} />
-                            </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Quick stats */}
-                <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100 shrink-0">
-                    <div className="px-4 py-3 text-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Costo</p>
-                        <p className="font-bold text-gray-900 flex items-center justify-center gap-1"><DollarSign size={14} className="text-green-500" />S/ {Number(course.price).toFixed(2)}</p>
+                {/* Right Side: Tabbed Content Workspace */}
+                <div className="flex-1 flex flex-col bg-surface min-w-0">
+                    {/* High-end Tab Navigation */}
+                    <div className="flex px-8 bg-white border-b border-outline-variant/10">
+                        <button onClick={() => setActiveTab('info')} className={navItemClass('info')}>
+                            Resumen
+                            {activeTab === 'info' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary animate-in slide-in-from-left-full duration-500" />}
+                        </button>
+                        <button onClick={() => setActiveTab('attachments')} className={navItemClass('attachments')}>
+                            Recursos ({course.attachments?.length || 0})
+                            {activeTab === 'attachments' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary animate-in slide-in-from-left-full duration-500" />}
+                        </button>
+                        <button onClick={() => setActiveTab('questions')} className={navItemClass('questions')}>
+                            Consultas ({course.questions?.length || 0})
+                            {activeTab === 'questions' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary animate-in slide-in-from-left-full duration-500" />}
+                        </button>
                     </div>
-                    <div className="px-4 py-3 text-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Inicio</p>
-                        <p className="font-bold text-gray-900 flex items-center justify-center gap-1"><CalendarDays size={14} className="text-blue-500" />
-                            {course.start_date ? new Date(course.start_date).toLocaleDateString('es-PE') : '—'}
-                        </p>
-                    </div>
-                    <div className="px-4 py-3 text-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Adjuntos</p>
-                        <p className="font-bold text-gray-900">{course.attachments?.length || 0}</p>
-                    </div>
-                </div>
 
-                {/* Tabs */}
-                <div className="border-b border-gray-100 flex px-4 shrink-0">
-                    <button onClick={() => setActiveTab('info')} className={tabClass('info')}>Información</button>
-                    <button onClick={() => setActiveTab('attachments')} className={tabClass('attachments')}>Adjuntos ({course.attachments?.length || 0})</button>
-                    <button onClick={() => setActiveTab('questions')} className={tabClass('questions')}>Consultas ({course.questions?.length || 0})</button>
-                </div>
+                    <div className="flex-1 overflow-y-auto p-10 scrollbar-thin scrollbar-thumb-outline-variant/20 scrollbar-track-transparent">
+                        {/* 1. INFO TAB: Editorial Layout */}
+                        {activeTab === 'info' && (
+                            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <section>
+                                    <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
+                                        <Info size={14} /> Sinopsis del Programa
+                                    </h3>
+                                    <p className="text-on-surface-variant text-lg font-medium leading-relaxed opacity-80">
+                                        {course.description || "Este programa académico está diseñado para potenciar las habilidades críticas en el área seleccionada, siguiendo los estándares internacionales de educación técnica y superior."}
+                                    </p>
+                                </section>
 
-                {/* Tab Content */}
-                <div className="flex-1 overflow-y-auto p-5">
-                    {/* INFO */}
-                    {activeTab === 'info' && (
-                        <div className="space-y-4">
-                            <div>
-                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Descripción</h3>
-                                <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
-                                    {course.description || <span className="italic text-gray-400">Sin descripción.</span>}
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 pt-2">
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Área</p>
-                                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{course.area?.name || '—'}</p>
+                                <div className="grid grid-cols-2 gap-8">
+                                    <div className="bg-white p-6 rounded-3xl ghost-border flex items-center gap-4 group hover:shadow-xl transition-all">
+                                        <div className="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                                            <CalendarDays size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Fecha Estimada</p>
+                                            <p className="font-headline font-bold text-primary">
+                                                {course.start_date ? new Date(course.start_date).toLocaleDateString('es-ES', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Próxima convocat.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-3xl ghost-border flex items-center gap-4 group hover:shadow-xl transition-all">
+                                        <div className="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                                            <Layers size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Nivel de Cargo</p>
+                                            <p className="font-headline font-bold text-primary uppercase tracking-tight">Postgrado / Senior</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Creado por</p>
-                                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{course.creator?.name || '—'}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
-                    {/* ATTACHMENTS */}
-                    {activeTab === 'attachments' && (
-                        <div className="space-y-4">
-                            {isJefe && (
-                                <div className="bg-gray-50 rounded-2xl p-4 space-y-3 border border-dashed border-gray-200">
-                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Agregar Adjunto</p>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setAttType('file')} className={`flex-1 text-xs font-bold py-2 rounded-xl transition ${attType === 'file' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                                            Archivo
-                                        </button>
-                                        <button onClick={() => setAttType('url')} className={`flex-1 text-xs font-bold py-2 rounded-xl transition ${attType === 'url' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                                            Link / URL
+                                <footer className="bg-surface-container-low/50 p-6 rounded-3xl border border-dashed border-outline-variant/30 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-full primary-gradient flex items-center justify-center text-white font-bold">
+                                            {course.creator?.name?.charAt(0) || 'U'}
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest leading-none">Creado por Administrador</p>
+                                            <p className="text-xs font-bold text-primary mt-1">{course.creator?.name || 'Staff ICEP'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest leading-none">Inversion Institucional</p>
+                                        <p className="font-headline font-bold text-primary mt-1 text-lg">S/ {Number(course.price).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+                                    </div>
+                                </footer>
+                            </div>
+                        )}
+
+                        {/* 2. ATTACHMENTS TAB: High-end Resource List */}
+                        {activeTab === 'attachments' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {isJefe && (
+                                    <div className="bg-white rounded-3xl p-8 space-y-6 ghost-border shadow-xl shadow-black/5">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Cargar Nuevo Recurso</h3>
+                                            <div className="flex bg-surface-container-low p-1 rounded-xl">
+                                                <button onClick={() => setAttType('file')} className={`px-4 py-1.5 text-[10px] font-bold rounded-lg transition-all ${attType === 'file' ? 'bg-primary text-white shadow-lg' : 'text-on-surface-variant/60 hover:text-primary'}`}>LOCAL</button>
+                                                <button onClick={() => setAttType('url')} className={`px-4 py-1.5 text-[10px] font-bold rounded-lg transition-all ${attType === 'url' ? 'bg-primary text-white shadow-lg' : 'text-on-surface-variant/60 hover:text-primary'}`}>NUBE / URL</button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-4">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ej: Silabo del Curso 2024 (Requerido)" 
+                                                value={attName} 
+                                                onChange={e => setAttName(e.target.value)}
+                                                className="w-full bg-surface-container-low border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-on-surface-variant/30" 
+                                            />
+                                            
+                                            {attType === 'file' ? (
+                                                <div className="relative group">
+                                                    <input 
+                                                        type="file" 
+                                                        onChange={e => setAttFile(e.target.files?.[0] || null)}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                                    />
+                                                    <div className="bg-surface-container-low/50 border-2 border-dashed border-outline-variant/30 rounded-2xl p-6 text-center group-hover:bg-white group-hover:border-primary/20 transition-all">
+                                                        <Plus size={24} className="mx-auto mb-2 text-on-surface-variant/40" />
+                                                        <p className="text-xs font-bold text-on-surface-variant/60 uppercase tracking-widest">
+                                                            {attFile ? attFile.name : 'Haz clic para seleccionar un archivo'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <input 
+                                                    type="url" 
+                                                    placeholder="https://drive.google.com/..." 
+                                                    value={attUrl} 
+                                                    onChange={e => setAttUrl(e.target.value)}
+                                                    className="w-full bg-surface-container-low border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-primary/10 transition-all" 
+                                                />
+                                            )}
+                                        </div>
+                                        
+                                        <button 
+                                            onClick={handleAddAttachment} 
+                                            disabled={savingAtt || !attName.trim()}
+                                            className="w-full py-4 bg-primary text-tertiary-fixed rounded-2xl font-black text-xs uppercase tracking-[0.3em] hover:shadow-2xl hover:shadow-primary/20 transition-all active:scale-95 disabled:opacity-30"
+                                        >
+                                            {savingAtt ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Confirmar Carga'}
                                         </button>
                                     </div>
-                                    <input type="text" placeholder="Nombre del recurso *" value={attName} onChange={e => setAttName(e.target.value)}
-                                        className="w-full border-2 border-gray-100 bg-white rounded-xl p-2.5 text-sm outline-none focus:border-blue-400 transition" />
-                                    {attType === 'file' ? (
-                                        <input type="file" onChange={e => setAttFile(e.target.files?.[0] || null)}
-                                            className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition" />
-                                    ) : (
-                                        <input type="url" placeholder="https://..." value={attUrl} onChange={e => setAttUrl(e.target.value)}
-                                            className="w-full border-2 border-gray-100 bg-white rounded-xl p-2.5 text-sm outline-none focus:border-blue-400 transition" />
-                                    )}
-                                    <button onClick={handleAddAttachment} disabled={savingAtt}
-                                        className="flex items-center gap-2 w-full justify-center bg-blue-600 text-white font-bold text-sm py-2.5 rounded-xl hover:bg-blue-700 transition">
-                                        {savingAtt ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Agregar
-                                    </button>
-                                </div>
-                            )}
+                                )}
 
-                            {course.attachments?.length === 0 ? (
-                                <div className="text-center text-gray-400 py-10">
-                                    <Paperclip size={36} className="mx-auto mb-2 text-gray-300" />
-                                    <p className="text-sm">Sin adjuntos aún.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {course.attachments?.map(att => (
-                                        <div key={att.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition group">
-                                            <div className="flex items-center gap-3">
-                                                {att.type === 'url' ? <Link2 size={18} className="text-blue-500 flex-shrink-0" /> : <Paperclip size={18} className="text-purple-500 flex-shrink-0" />}
-                                                <div>
-                                                    <p className="text-sm font-semibold text-gray-800">{att.name}</p>
-                                                    <p className="text-[10px] text-gray-400">{att.type === 'file' ? (att.mime_type || 'Archivo') : 'URL externa'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                {att.type === 'url' ? (
-                                                    <a href={att.url || '#'} target="_blank" rel="noreferrer"
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Abrir">
-                                                        <ExternalLink size={15} />
-                                                    </a>
-                                                ) : (
-                                                    <a href={att.path ? `/storage/${att.path}` : '#'} target="_blank" rel="noreferrer"
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Descargar">
-                                                        <Download size={15} />
-                                                    </a>
-                                                )}
-                                                {isJefe && (
-                                                    <button onClick={() => handleDeleteAttachment(att.id)}
-                                                        className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100">
-                                                        <Trash2 size={15} />
-                                                    </button>
-                                                )}
-                                            </div>
+                                <div className="space-y-4">
+                                    <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-4">Materiales Disponibles</h3>
+                                    {course.attachments?.length === 0 ? (
+                                        <div className="text-center py-12 bg-white rounded-3xl ghost-border">
+                                            <Sparkles size={32} className="mx-auto mb-3 text-on-surface-variant/20" />
+                                            <p className="text-xs font-bold text-on-surface-variant/40 uppercase tracking-widest">No hay recursos vinculados aún.</p>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* QUESTIONS */}
-                    {activeTab === 'questions' && (
-                        <div className="space-y-4">
-                            {/* Ask question (asesor or any non-jefe) */}
-                            {!isJefe && (
-                                <div className="bg-blue-50 rounded-2xl p-4 space-y-3 border border-blue-100">
-                                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Hacer una Consulta</p>
-                                    <textarea
-                                        value={questionText}
-                                        onChange={e => setQuestionText(e.target.value)}
-                                        rows={3}
-                                        placeholder="¿Cuáles son los requisitos para inscribirse?..."
-                                        className="w-full border-2 border-blue-100 bg-white rounded-xl p-3 text-sm outline-none focus:border-blue-500 transition"
-                                    />
-                                    <button onClick={handleAskQuestion} disabled={savingQ || !questionText.trim()}
-                                        className="flex items-center gap-2 text-sm font-bold bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 transition">
-                                        {savingQ ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar Consulta
-                                    </button>
-                                </div>
-                            )}
-
-                            {course.questions?.length === 0 ? (
-                                <div className="text-center text-gray-400 py-10">
-                                    <MessageSquare size={36} className="mx-auto mb-2 text-gray-300" />
-                                    <p className="text-sm">No hay consultas registradas.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {course.questions?.map(q => (
-                                        <div key={q.id} className={`rounded-2xl border overflow-hidden ${q.status === 'answered' ? 'border-green-200' : q.status === 'closed' ? 'border-gray-200' : 'border-yellow-200'}`}>
-                                            <div className="p-4 bg-white">
-                                                <div className="flex justify-between items-start gap-2 mb-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
-                                                            {q.asker?.name?.charAt(0)}
+                                    ) : (
+                                        <div className="grid gap-3">
+                                            {course.attachments?.map(att => (
+                                                <div key={att.id} className="flex items-center justify-between p-5 bg-white rounded-2xl ghost-border hover:bg-surface-container-low/50 hover:shadow-lg transition-all group/item">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${att.type === 'url' ? 'bg-secondary-container text-on-secondary-container' : 'bg-primary text-tertiary-fixed'}`}>
+                                                            {att.type === 'url' ? <Link2 size={20} /> : <FileText size={20} />}
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-bold text-gray-800">{q.asker?.name}</p>
-                                                            <p className="text-[10px] text-gray-400">{new Date(q.created_at).toLocaleString()}</p>
+                                                            <p className="text-sm font-bold text-primary tracking-tight">{att.name}</p>
+                                                            <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">{att.type === 'file' ? 'Archivo Institucional' : 'Recurso Externo'}</p>
                                                         </div>
                                                     </div>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${q.status === 'answered' ? 'bg-green-100 text-green-700' : q.status === 'closed' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                        {q.status === 'pending' ? 'Pendiente' : q.status === 'answered' ? 'Respondida' : 'Cerrada'}
-                                                    </span>
+                                                    <div className="flex items-center gap-3">
+                                                        <a 
+                                                            href={att.type === 'url' ? (att.url || '#') : (att.path ? `/storage/${att.path}` : '#')} 
+                                                            target="_blank" 
+                                                            rel="noreferrer"
+                                                            className="p-3 bg-surface-container-low text-primary rounded-xl hover:bg-primary hover:text-white transition-all shadow-sm"
+                                                        >
+                                                            {att.type === 'url' ? <ExternalLink size={18} /> : <Download size={18} />}
+                                                        </a>
+                                                        {isJefe && (
+                                                            <button 
+                                                                onClick={() => handleDeleteAttachment(att.id)}
+                                                                className="p-3 bg-error/5 text-error rounded-xl hover:bg-error hover:text-white transition-all opacity-0 group-hover/item:opacity-100"
+                                                            >
+                                                                <Trash2 size={18} />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <p className="text-sm text-gray-700 ml-9">{q.question}</p>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. QUESTIONS TAB: High-end Inquiry Log */}
+                        {activeTab === 'questions' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pr-1">
+                                {!isJefe && (
+                                    <div className="bg-primary-container p-8 rounded-3xl text-white relative overflow-hidden group">
+                                        <div className="relative z-10 space-y-6">
+                                            <div className="flex items-center gap-3">
+                                              <MessageSquare className="text-tertiary-fixed" />
+                                              <h3 className="font-headline font-extrabold text-xl">¿Tienes una duda técnica?</h3>
                                             </div>
+                                            <textarea
+                                                value={questionText}
+                                                onChange={e => setQuestionText(e.target.value)}
+                                                rows={4}
+                                                placeholder="Describe tu consulta aquí. Los encargados responderán a la brevedad..."
+                                                className="w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 text-sm text-white placeholder:text-white/30 outline-none focus:bg-white/20 transition-all font-medium"
+                                            />
+                                            <button 
+                                                onClick={handleAskQuestion} 
+                                                disabled={savingQ || !questionText.trim()}
+                                                className="bg-tertiary-fixed text-on-tertiary-fixed font-black text-[10px] uppercase tracking-[0.2em] px-8 py-4 rounded-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-30 shadow-xl shadow-black/20"
+                                            >
+                                                {savingQ ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Despachar Consulta'}
+                                            </button>
+                                        </div>
+                                        <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:rotate-12 transition-transform duration-1000">
+                                          <HelpCircle size={160} />
+                                        </div>
+                                    </div>
+                                )}
 
-                                            {q.answer && (
-                                                <div className="p-4 bg-green-50/50 border-t border-green-100">
-                                                    <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">
-                                                        Respuesta de {q.answerer?.name} · {q.answered_at ? new Date(q.answered_at).toLocaleDateString() : ''}
-                                                    </p>
-                                                    <p className="text-sm text-gray-700">{q.answer}</p>
-                                                </div>
-                                            )}
-
-                                            {isJefe && q.status === 'pending' && (
-                                                <div className="border-t border-dashed border-yellow-200">
-                                                    {expandedQ === q.id ? (
-                                                        <div className="p-4 space-y-3 bg-yellow-50/50">
-                                                            <textarea value={answerText} onChange={e => setAnswerText(e.target.value)} rows={3}
-                                                                placeholder="Escribe la respuesta..."
-                                                                className="w-full border-2 border-yellow-200 bg-white rounded-xl p-3 text-sm outline-none focus:border-yellow-400 transition" />
-                                                            <div className="flex gap-2">
-                                                                <button onClick={() => setExpandedQ(null)} className="px-4 py-2 text-xs font-bold bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition">Cancelar</button>
-                                                                <button onClick={() => handleAnswerQuestion(q.id)} disabled={savingAnswer || !answerText.trim()}
-                                                                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 transition">
-                                                                    {savingAnswer ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Responder
-                                                                </button>
+                                <div className="space-y-6">
+                                    <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-4">Registro Histórico de Consultas</h3>
+                                    {course.questions?.length === 0 ? (
+                                        <div className="text-center py-20 bg-white rounded-[2.5rem] ghost-border flex flex-col items-center">
+                                            <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center mb-4 text-on-surface-variant/20">
+                                              <MessageSquare size={32} />
+                                            </div>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Aún no se han registrado consultas para este curso.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-6">
+                                            {course.questions?.map(q => (
+                                                <div key={q.id} className="group/q">
+                                                    <div className={`p-8 rounded-[2rem] bg-white ghost-border hover:shadow-xl transition-all duration-500 relative ${q.status === 'pending' ? 'border-l-8 border-l-on-primary-container' : 'border-l-8 border-l-tertiary-fixed'}`}>
+                                                        <div className="flex justify-between items-start mb-6">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="h-10 w-10 rounded-full primary-gradient flex items-center justify-center text-white font-bold shadow-sm">
+                                                                    {q.asker?.name?.charAt(0)}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-primary tracking-tight leading-none mb-1">{q.asker?.name}</p>
+                                                                    <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+                                                                        {new Date(q.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="status-jewel shadow-sm">
+                                                                <div className={`status-dot ${q.status === 'pending' ? 'bg-on-primary-container animate-pulse' : 'bg-tertiary-fixed'}`} />
+                                                                <span className="text-[8px] font-black text-on-surface-variant uppercase tracking-[0.2em]">{q.status === 'pending' ? 'EN ESPERA' : 'RESUELTO'}</span>
                                                             </div>
                                                         </div>
-                                                    ) : (
-                                                        <button onClick={() => { setExpandedQ(q.id); setAnswerText(''); }}
-                                                            className="w-full text-xs font-bold text-yellow-700 bg-yellow-50 hover:bg-yellow-100 py-2.5 transition flex items-center justify-center gap-1.5">
-                                                            <ChevronDown size={14} /> Responder
-                                                        </button>
-                                                    )}
+                                                        <p className="text-on-surface-variant font-medium leading-relaxed italic border-l-4 border-surface-container-high pl-6 mb-8 group-hover/q:text-primary transition-colors">
+                                                            "{q.question}"
+                                                        </p>
+
+                                                        {q.answer && (
+                                                            <div className="bg-surface-container-low/50 p-6 rounded-2xl animate-in slide-in-from-top-4 duration-500">
+                                                                <div className="flex items-center gap-2 mb-3">
+                                                                    <Sparkles size={14} className="text-on-tertiary-container" />
+                                                                    <p className="text-[10px] font-black text-on-tertiary-container uppercase tracking-widest">Respuesta del Secretario Académico</p>
+                                                                </div>
+                                                                <p className="text-sm text-on-surface-variant font-bold leading-relaxed">{q.answer}</p>
+                                                            </div>
+                                                        )}
+
+                                                        {isJefe && q.status === 'pending' && (
+                                                            <div className="mt-8 pt-8 border-t border-outline-variant/10">
+                                                                {expandedQ === q.id ? (
+                                                                    <div className="space-y-4 animate-in fade-in zoom-in-95">
+                                                                        <textarea 
+                                                                            value={answerText} 
+                                                                            onChange={e => setAnswerText(e.target.value)} 
+                                                                            rows={3}
+                                                                            placeholder="Redacta la respuesta oficial de la institución..."
+                                                                            className="w-full bg-surface-container-low border-2 border-primary/20 rounded-2xl p-5 text-sm font-medium focus:ring-4 focus:ring-primary/5 outline-none transition-all" 
+                                                                        />
+                                                                        <div className="flex gap-3 justify-end">
+                                                                            <button onClick={() => setExpandedQ(null)} className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors">Abortar</button>
+                                                                            <button 
+                                                                                onClick={() => handleAnswerQuestion(q.id)} 
+                                                                                disabled={savingAnswer || !answerText.trim()}
+                                                                                className="px-8 py-3 bg-primary text-tertiary-fixed rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                                                                            >
+                                                                                {savingAnswer ? <Loader2 size={14} className="animate-spin" /> : 'Publicar Respuesta'}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button 
+                                                                        onClick={() => { setExpandedQ(q.id); setAnswerText(''); }}
+                                                                        className="w-full py-4 bg-primary/5 text-primary text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-3 px-8"
+                                                                    >
+                                                                        Atender Consulta <ArrowRight size={14} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            )}
+                                            ))}
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

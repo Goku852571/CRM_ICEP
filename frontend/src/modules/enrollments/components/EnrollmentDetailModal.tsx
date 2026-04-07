@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getEnrollment, updateEnrollmentStatus, EnrollmentForm } from '../services/enrollmentService';
-import { X, Clock, User, Link as LinkIcon, AlertCircle } from 'lucide-react';
+import { X, Clock, User, Link as LinkIcon, AlertCircle, MapPin, CreditCard, Mail, Phone, Calendar, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/shared/hooks/useAuth';
 
 interface Props {
@@ -99,31 +99,96 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-              <span className="text-xs text-gray-400 font-bold uppercase tracking-wider block mb-2">Datos del Estudiante</span>
-              <p className="font-semibold text-gray-900 text-lg">{enrollment.student_name || 'No proporcionado'}</p>
-              <p className="text-sm text-gray-600 mt-1">{enrollment.student_email}</p>
-              <p className="text-sm text-gray-600">{enrollment.student_phone}</p>
-              <p className="text-sm text-gray-600">{enrollment.student_id_number && `ID: ${enrollment.student_id_number}`}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-outline-variant/20 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    <User size={18} />
+                 </div>
+                 <span className="text-xs text-on-surface-variant font-black uppercase tracking-widest">Datos del Estudiante</span>
+              </div>
+              
+              <div className="space-y-4">
+                 <div>
+                    <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-tighter mb-1">Nombre Completo</p>
+                    <p className="font-bold text-on-surface text-lg leading-tight">{enrollment.student_name || 'No proporcionado'}</p>
+                 </div>
+
+                 <div className="grid grid-cols-1 gap-3">
+                    <div className="flex items-center gap-3">
+                       <div className="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center text-on-surface-variant/60">
+                          <CreditCard size={14} />
+                       </div>
+                       <span className="text-xs font-bold text-on-surface">{enrollment.student_id_number || 'Cédula no registrada'}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                       <div className="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center text-on-surface-variant/60">
+                          <Mail size={14} />
+                       </div>
+                       <span className="text-xs font-medium text-on-surface">{enrollment.student_email || 'Correo no registrado'}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                       <div className="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center text-on-surface-variant/60">
+                          <Phone size={14} />
+                       </div>
+                       <span className="text-xs font-bold text-on-surface">{enrollment.student_phone || 'Teléfono no registrado'}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                       <div className="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center text-on-surface-variant/60">
+                          <MapPin size={14} />
+                       </div>
+                       <span className="text-xs font-bold text-on-surface">{enrollment.student_city || 'Ciudad no registrada'}</span>
+                    </div>
+                 </div>
+              </div>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-               <span className="text-xs text-gray-400 font-bold uppercase tracking-wider block mb-2">Información del Sistema</span>
-               <div className="space-y-2">
-                 <div className="flex justify-between text-sm">
-                   <span className="text-gray-500">Asesor</span>
-                   <span className="font-medium text-gray-900">{enrollment.advisor?.name}</span>
+            <div className="bg-white p-6 rounded-2xl border border-outline-variant/20 shadow-sm">
+               <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-tertiary-fixed/10 flex items-center justify-center text-tertiary-fixed">
+                     <ShieldCheck size={18} />
+                  </div>
+                  <span className="text-xs text-on-surface-variant font-black uppercase tracking-widest">Estado del Proceso</span>
+               </div>
+               
+               <div className="space-y-4">
+                 <div className="flex justify-between items-center bg-surface-container-lowest p-3 rounded-xl border border-outline-variant/5">
+                    <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase">Estado Actual</span>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${StatusMap[enrollment.status].color}`}>
+                     {StatusMap[enrollment.status].label}
+                    </span>
                  </div>
-                 <div className="flex justify-between text-sm">
-                   <span className="text-gray-500">Estado</span>
-                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${StatusMap[enrollment.status].color}`}>
-                    {StatusMap[enrollment.status].label}
-                   </span>
-                 </div>
-                 <div className="flex justify-between text-sm">
-                   <span className="text-gray-500">Creado</span>
-                   <span className="font-medium text-gray-900 text-xs">{new Date(enrollment.created_at).toLocaleDateString()}</span>
+                 
+                 <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                       <div className="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center text-on-surface-variant/60">
+                          <User size={14} />
+                       </div>
+                       <div>
+                          <p className="text-[9px] font-bold text-on-surface-variant/40 uppercase leading-none">Asesor Asignado</p>
+                          <p className="text-xs font-bold text-on-surface">{enrollment.advisor?.name}</p>
+                       </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                       <div className="w-6 h-6 rounded-md bg-surface-container flex items-center justify-center text-on-surface-variant/60">
+                          <Calendar size={14} />
+                       </div>
+                       <div>
+                          <p className="text-[9px] font-bold text-on-surface-variant/40 uppercase leading-none">Fecha de Emisión</p>
+                          <p className="text-xs font-bold text-on-surface">{new Date(enrollment.created_at).toLocaleDateString()}</p>
+                       </div>
+                    </div>
+                    {enrollment.completed_at && (
+                       <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 rounded-md bg-green-50 flex items-center justify-center text-green-600">
+                             <CheckCircle2 size={14} />
+                          </div>
+                          <div>
+                             <p className="text-[9px] font-bold text-green-600/60 uppercase leading-none">Completado por Cliente</p>
+                             <p className="text-xs font-bold text-on-surface">{new Date(enrollment.completed_at).toLocaleString()}</p>
+                          </div>
+                       </div>
+                    )}
                  </div>
                </div>
             </div>

@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import Swal from 'sweetalert2';
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -31,6 +32,16 @@ api.interceptors.response.use(
         }
       }
     }
+
+    if (error.response?.status === 403) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Acceso Denegado',
+        text: 'No tienes los permisos necesarios para realizar esta acción o acceder a esta información.',
+        confirmButtonColor: '#3085d6',
+      });
+    }
+
     return Promise.reject(error);
   }
 );
