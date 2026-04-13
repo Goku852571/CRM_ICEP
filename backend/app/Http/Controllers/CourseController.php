@@ -14,7 +14,7 @@ class CourseController extends ApiController
     // ── INDEX ────────────────────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
-        $query = Course::with(['area', 'creator', 'attachments']);
+        $query = Course::with(['area', 'creator', 'attachments', 'catalogItems']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -31,6 +31,13 @@ class CourseController extends ApiController
     // ── STORE ────────────────────────────────────────────────────────
     public function store(Request $request): JsonResponse
     {
+        // Handle JSON fields from FormData
+        foreach (['schedules', 'catalog_items', 'practice_city'] as $field) {
+            if ($request->has($field) && is_string($request->$field)) {
+                $request->merge([$field => json_decode($request->$field, true)]);
+            }
+        }
+
         $request->validate([
             'name'        => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -39,6 +46,17 @@ class CourseController extends ApiController
             'status'      => 'required|in:draft,active,inactive,finished,archived',
             'start_date'  => 'nullable|date',
             'cover_image' => 'nullable|image|max:5120', // 5MB
+            'practice_city' => 'nullable|array',
+            'duration'     => 'nullable|string|max:255',
+            'min_price'    => 'nullable|numeric|min:0',
+            'discount'     => 'nullable|numeric|min:0',
+            'enrollment_value'   => 'nullable|numeric|min:0',
+            'installments_count' => 'nullable|integer|min:0',
+            'installment_value'  => 'nullable|numeric|min:0',
+            'min_installment_value' => 'nullable|numeric|min:0',
+            'schedules'    => 'nullable|array',
+            'catalog_items' => 'nullable|array',
+            'catalog_items.*' => 'exists:course_catalog_items,id',
         ]);
 
         $coverPath = null;
@@ -47,14 +65,23 @@ class CourseController extends ApiController
         }
 
         $course = Course::create([
-            'name'        => $request->name,
-            'description' => $request->description,
-            'area_id'     => $request->area_id,
-            'price'       => $request->price ?? 0,
-            'status'      => $request->status,
-            'start_date'  => $request->start_date,
-            'cover_image' => $coverPath,
-            'created_by'  => $request->user()->id,
+            'name'          => $request->name,
+            'description'   => $request->description,
+            'area_id'       => $request->area_id,
+            'price'         => $request->price ?? 0,
+            'status'        => $request->status,
+            'start_date'    => $request->start_date,
+            'cover_image'   => $coverPath,
+            'created_by'    => $request->user()->id,
+            'practice_city' => $request->practice_city,
+            'duration'      => $request->duration,
+            'min_price'     => $request->min_price ?? 0,
+            'discount'      => $request->discount ?? 0,
+            'enrollment_value'   => $request->enrollment_value ?? 0,
+            'installments_count' => $request->installments_count ?? 0,
+            'installment_value'  => $request->installment_value ?? 0,
+            'min_installment_value' => $request->min_installment_value ?? 0,
+            'schedules'     => $request->schedules,
         ]);
 
         // Auto-create calendar event if start_date provided
@@ -69,14 +96,18 @@ class CourseController extends ApiController
             ]);
         }
 
-        return $this->success($course->load(['area', 'creator', 'attachments']), 'Curso creado', 201);
+        if ($request->has('catalog_items')) {
+            $course->catalogItems()->sync($request->catalog_items);
+        }
+
+        return $this->success($course->load(['area', 'creator', 'attachments', 'catalogItems']), 'Curso creado', 201);
     }
 
     // ── SHOW ─────────────────────────────────────────────────────────
     public function show(Course $course): JsonResponse
     {
         return $this->success(
-            $course->load(['area', 'creator', 'attachments', 'questions.asker', 'questions.answerer']),
+            $course->load(['area', 'creator', 'attachments', 'questions.asker', 'questions.answerer', 'catalogItems']),
             'Curso encontrado'
         );
     }
@@ -84,6 +115,13 @@ class CourseController extends ApiController
     // ── UPDATE ───────────────────────────────────────────────────────
     public function update(Request $request, Course $course): JsonResponse
     {
+        // Handle JSON fields from FormData
+        foreach (['schedules', 'catalog_items', 'practice_city'] as $field) {
+            if ($request->has($field) && is_string($request->$field)) {
+                $request->merge([$field => json_decode($request->$field, true)]);
+            }
+        }
+
         $request->validate([
             'name'        => 'string|max:255',
             'description' => 'nullable|string',
@@ -92,9 +130,24 @@ class CourseController extends ApiController
             'status'      => 'in:draft,active,inactive,finished,archived',
             'start_date'  => 'nullable|date',
             'cover_image' => 'nullable|image|max:5120',
+            'practice_city' => 'nullable|array',
+            'duration'     => 'nullable|string|max:255',
+            'min_price'    => 'nullable|numeric|min:0',
+            'discount'     => 'nullable|numeric|min:0',
+            'enrollment_value'   => 'nullable|numeric|min:0',
+            'installments_count' => 'nullable|integer|min:0',
+            'installment_value'  => 'nullable|numeric|min:0',
+            'min_installment_value' => 'nullable|numeric|min:0',
+            'schedules'    => 'nullable|array',
+            'catalog_items' => 'nullable|array',
+            'catalog_items.*' => 'exists:course_catalog_items,id',
         ]);
 
-        $data = $request->only(['name', 'description', 'area_id', 'price', 'status', 'start_date']);
+        $data = $request->only([
+            'name', 'description', 'area_id', 'price', 'status', 'start_date',
+            'practice_city', 'duration', 'min_price', 'discount', 'schedules',
+            'enrollment_value', 'installments_count', 'installment_value', 'min_installment_value'
+        ]);
 
         if ($request->hasFile('cover_image')) {
             if ($course->cover_image) {
@@ -105,7 +158,11 @@ class CourseController extends ApiController
 
         $course->update($data);
 
-        return $this->success($course->load(['area', 'creator', 'attachments']), 'Curso actualizado');
+        if ($request->has('catalog_items')) {
+            $course->catalogItems()->sync($request->catalog_items);
+        }
+
+        return $this->success($course->load(['area', 'creator', 'attachments', 'catalogItems']), 'Curso actualizado');
     }
 
     // ── DESTROY ──────────────────────────────────────────────────────
@@ -165,7 +222,7 @@ class CourseController extends ApiController
     public function listForEnrollment(): JsonResponse
     {
         $courses = Course::where('status', 'active')
-            ->select('id', 'name', 'price')
+            ->select('id', 'name', 'price', 'min_price', 'enrollment_value', 'installments_count', 'installment_value', 'min_installment_value')
             ->orderBy('name')
             ->get();
 

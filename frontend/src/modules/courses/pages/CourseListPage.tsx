@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCourses, deleteCourse, updateCourseStatus, Course } from '../services/courseService';
 import CourseFormModal from '../components/CourseFormModal';
 import CourseDetailModal from '../components/CourseDetailModal';
+import CourseCatalogManager from '../components/CourseCatalogManager';
 import {
   Plus,
   Search,
@@ -34,6 +35,7 @@ export default function CourseListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isCatalogManagerOpen, setIsCatalogManagerOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -152,6 +154,17 @@ export default function CourseListPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+
+        {/* Catalog Action */}
+        <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsCatalogManagerOpen(true)}
+              className="px-8 py-5 bg-white border-2 border-primary/10 text-primary rounded-[2rem] font-bold text-xs uppercase tracking-widest hover:bg-primary hover:text-white hover:border-primary transition-all active:scale-95 shadow-sm flex items-center gap-3"
+            >
+              <Activity size={18} />
+              Gestionar Catálogo
+            </button>
         </div>
       </div>
 
@@ -337,6 +350,12 @@ export default function CourseListPage() {
             setSelectedCourse(null);
           }}
           onEdit={handleEdit}
+        />
+      )}
+
+      {isCatalogManagerOpen && (
+        <CourseCatalogManager 
+          onClose={() => setIsCatalogManagerOpen(false)}
         />
       )}
     </div>

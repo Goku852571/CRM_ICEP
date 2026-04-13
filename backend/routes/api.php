@@ -29,8 +29,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
         // Usuarios
+        Route::get('/users', [UserController::class, 'index']); // Public to all auth users (for assignments)
+        Route::get('/users/jefes', [UserController::class, 'getJefes']); // Lista de usuarios con rol jefe
         Route::apiResource('users', UserController::class)
-            ->middleware('permission:users.view_all|users.create|users.edit');
+            ->only(['store', 'show', 'update', 'destroy'])
+            ->middleware('permission:users.create|users.edit');
         
         // Roles
         Route::apiResource('roles', RoleController::class)
@@ -51,13 +54,17 @@ Route::prefix('v1')->group(function () {
         Route::get('/courses', [\App\Http\Controllers\CourseController::class, 'index']);
         
         // Tickets
+        Route::post('/tickets/{ticket}/replies', [\App\Http\Controllers\TicketController::class, 'storeReply']);
         Route::apiResource('tickets', \App\Http\Controllers\TicketController::class);
         Route::patch('/tickets/{ticket}/status', [\App\Http\Controllers\TicketController::class, 'updateStatus']);
         Route::patch('/tickets/{ticket}/priority', [\App\Http\Controllers\TicketController::class, 'updatePriority']);
 
         // Formularios de Matrícula (Admin)
+        Route::get('/enrollments/export', [\App\Http\Controllers\EnrollmentFormController::class, 'export']);
         Route::apiResource('enrollments', \App\Http\Controllers\EnrollmentFormController::class);
         Route::patch('/enrollments/{enrollment}/status', [\App\Http\Controllers\EnrollmentFormController::class, 'updateStatus']);
+        Route::post('/enrollments/{enrollment}/payment', [\App\Http\Controllers\EnrollmentFormController::class, 'submitPayment']);
+        Route::post('/enrollments/{enrollment}/confirm-payment', [\App\Http\Controllers\EnrollmentFormController::class, 'confirmPayment']);
 
         // Calendario (Eventos)
         Route::apiResource('events', \App\Http\Controllers\EventController::class);
@@ -76,7 +83,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/sales/advisor/{id}/stats', [\App\Http\Controllers\SalesDashboardController::class, 'advisorStats']);
             Route::get('/sales/export', [\App\Http\Controllers\SalesDashboardController::class, 'export']);
             Route::post('/sales/opportunities/{id}/approve', [\App\Http\Controllers\SalesDashboardController::class, 'approveOpportunity']);
+
+            // Control de Matrículas — Auditoría Financiera
+            Route::get('/sales/enrollment-audit', [\App\Http\Controllers\SalesDashboardController::class, 'getEnrollmentAuditData']);
+            Route::patch('/sales/enrollments/{id}/financials', [\App\Http\Controllers\SalesDashboardController::class, 'updateEnrollmentFinancials']);
+            Route::get('/sales/enrollment-audit/export', [\App\Http\Controllers\SalesDashboardController::class, 'exportDetailedReport']);
         });
+
 
 
 
@@ -86,6 +99,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('courses', \App\Http\Controllers\CourseController::class);
         Route::post('/courses/{course}/attachments', [\App\Http\Controllers\CourseController::class, 'storeAttachment']);
         Route::delete('/courses/{course}/attachments/{attachment}', [\App\Http\Controllers\CourseController::class, 'destroyAttachment']);
+
+        // Catálogo de Cursos (Avales, Auspicios, Certificados)
+        Route::apiResource('course-catalog', \App\Http\Controllers\CourseCatalogItemController::class);
 
         // Preguntas de Cursos
         Route::get('/courses/{course}/questions', [\App\Http\Controllers\CourseQuestionController::class, 'index']);

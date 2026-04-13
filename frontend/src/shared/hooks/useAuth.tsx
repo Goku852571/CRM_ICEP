@@ -91,6 +91,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.error(e);
     } finally {
+      // Tell the Service Worker to stop polling
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration('/notification-sw.js');
+        if (reg?.active) {
+          reg.active.postMessage({ type: 'LOGOUT' });
+        }
+      }
       localStorage.removeItem('token');
       setUser(null);
       setPermissions([]);

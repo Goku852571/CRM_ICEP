@@ -6,8 +6,9 @@ import {
   MapPin, CheckCircle2, ChevronRight, XCircle, Tag, Building2, User
 } from 'lucide-react';
 import { getLeads, updateLeadStatus, Lead } from '../services/leadService';
-import LeadDetailDrawer from '../components/LeadDetailDrawer';
+import LeadDetailModal from '../components/LeadDetailModal';
 import ImportLeadsModal from '../components/ImportLeadsModal';
+import LeadFormModal from '../components/LeadFormModal';
 import { showSuccess, showError } from '@/shared/utils/alerts';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { DownloadCloud } from 'lucide-react';
@@ -32,6 +33,7 @@ export default function LeadBoardPage() {
   const [advisorFilter, setAdvisorFilter] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showLeadForm, setShowLeadForm] = useState(false);
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ['leads', { kanban: true }],
@@ -151,7 +153,10 @@ export default function LeadBoardPage() {
             </button>
           )}
 
-          <button className="flex items-center gap-2 bg-primary-container text-on-primary-container disabled:opacity-50 px-4 py-2 rounded-xl font-bold text-sm hover:shadow-md transition-all">
+          <button 
+            onClick={() => setShowLeadForm(true)}
+            className="flex items-center gap-2 bg-primary-container text-on-primary-container disabled:opacity-50 px-4 py-2 rounded-xl font-bold text-sm hover:shadow-md transition-all active:scale-95"
+          >
             <Plus size={18} />
             <span className="hidden sm:inline">Nuevo Lead</span>
           </button>
@@ -277,9 +282,9 @@ export default function LeadBoardPage() {
         </DragDropContext>
       </div>
 
-      {/* Drawer */}
+      {/* Modal Details */}
       {selectedLeadId && (
-        <LeadDetailDrawer 
+        <LeadDetailModal 
           leadId={selectedLeadId} 
           onClose={() => setSelectedLeadId(null)} 
           onUpdated={() => queryClient.invalidateQueries({ queryKey: ['leads'] })}
@@ -292,6 +297,17 @@ export default function LeadBoardPage() {
           onClose={() => setShowImportModal(false)}
           onSuccess={() => {
             setShowImportModal(false);
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
+          }}
+        />
+      )}
+
+      {/* New Lead Form */}
+      {showLeadForm && (
+        <LeadFormModal
+          onClose={() => setShowLeadForm(false)}
+          onSuccess={() => {
+            setShowLeadForm(false);
             queryClient.invalidateQueries({ queryKey: ['leads'] });
           }}
         />

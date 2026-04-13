@@ -22,7 +22,16 @@ import {
   Sparkles,
   ArrowRight,
   FileText,
-  HelpCircle
+  HelpCircle,
+  MapPin,
+  Clock,
+  ShieldCheck,
+  Award,
+  CheckSquare,
+  Tag,
+  Eye,
+  CreditCard,
+  Activity
 } from 'lucide-react';
 import { showSuccess, showError, showConfirmDanger, showToast } from '@/shared/utils/alerts';
 
@@ -53,6 +62,9 @@ export default function CourseDetailModal({ courseId, isJefe, canEdit, onClose, 
     const [expandedQ, setExpandedQ] = useState<number | null>(null);
     const [answerText, setAnswerText] = useState('');
     const [savingAnswer, setSavingAnswer] = useState(false);
+
+    // Preview state
+    const [previewResource, setPreviewResource] = useState<{ url: string; type: string; name: string } | null>(null);
 
     const fetchCourse = async () => {
         try {
@@ -143,348 +155,341 @@ export default function CourseDetailModal({ courseId, isJefe, canEdit, onClose, 
             ? 'text-primary' 
             : 'text-on-surface-variant/40 hover:text-on-surface-variant hover:bg-surface-container-low/30'
         }`;
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/20 backdrop-blur-sm p-4 animate-in fade-in duration-500">
             <div className="bg-surface-container-lowest rounded-[2.5rem] w-full max-w-[1000px] shadow-2xl shadow-black/20 overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[700px] ghost-border scale-in-center duration-500 relative">
                 
-                {/* Global Close Button */}
-                <button 
-                  onClick={onClose} 
-                  className="absolute top-6 right-6 z-50 p-3 bg-white/80 backdrop-blur shadow-xl border border-outline-variant/10 text-on-surface-variant hover:text-primary rounded-2xl transition-all active:scale-95 group"
-                >
+                <button onClick={onClose} className="absolute top-6 right-6 z-50 p-3 bg-white/80 backdrop-blur shadow-xl border border-outline-variant/10 text-on-surface-variant hover:text-primary rounded-2xl transition-all active:scale-95 group">
                     <X size={20} className="group-hover:rotate-90 transition-transform" />
                 </button>
                 
-                {/* Left Side: Art & Title Banner */}
                 <div className="md:w-2/5 relative shrink-0 overflow-hidden group">
                     <div className="absolute inset-0 primary-gradient transition-all duration-1000 group-hover:scale-110">
-                        {coverUrl ? (
-                            <img src={coverUrl} alt={course.name} className="w-full h-full object-cover opacity-60 mix-blend-overlay" />
-                        ) : (
-                            <div className="flex items-center justify-center h-full opacity-20"><BookOpen size={120} /></div>
-                        )}
+                        {coverUrl ? <img src={coverUrl} alt={course.name} className="w-full h-full object-cover opacity-60 mix-blend-overlay" /> : <div className="flex items-center justify-center h-full opacity-20"><BookOpen size={120} /></div>}
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/20 to-transparent" />
-                    
                     <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col justify-end">
                         <div className="status-jewel mb-6 w-fit bg-white/10 backdrop-blur-xl text-white border-white/10">
                             <div className={`status-dot ${course.status === 'active' ? 'bg-tertiary-fixed' : 'bg-error'}`} />
                             <span className="text-[10px] font-bold tracking-widest">{status.label}</span>
                         </div>
-                        <h1 className="font-headline font-extrabold text-white text-4xl lg:text-5xl tracking-tight leading-tight mb-4 group-hover:translate-x-1 transition-transform">
-                            {course.name}
-                        </h1>
-                        <p className="text-white/60 font-medium text-xs uppercase tracking-[0.15em] mb-8">
-                            REF: {course.code || 'EDU-BASE-001'} • {course.area?.name || 'Área General'}
-                        </p>
-                        
-                        <div className="flex gap-4">
-                            {canEdit && (
-                                <button 
-                                  onClick={() => onEdit(course)} 
-                                  className="flex-1 py-4 bg-tertiary-fixed text-on-tertiary-fixed rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-white hover:text-primary transition-all active:scale-95 shadow-lg shadow-black/10"
-                                >
-                                    <Pencil size={14} /> Editar Curso
-                                </button>
-                            )}
-                        </div>
+                        <h1 className="font-headline font-extrabold text-white text-4xl lg:text-5xl tracking-tight leading-tight mb-4">{course.name}</h1>
+                        <p className="text-white/60 font-medium text-xs uppercase tracking-[0.15em] mb-8">REF: {course.code} • {course.area?.name}</p>
+                        {canEdit && <button onClick={() => onEdit(course)} className="w-full py-4 bg-tertiary-fixed text-on-tertiary-fixed rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-white hover:text-primary transition shadow-lg"><Pencil size={14} /> Editar Curso</button>}
                     </div>
                 </div>
 
-                {/* Right Side: Tabbed Content Workspace */}
                 <div className="flex-1 flex flex-col bg-surface min-w-0">
-                    {/* High-end Tab Navigation */}
                     <div className="flex px-8 bg-white border-b border-outline-variant/10">
-                        <button onClick={() => setActiveTab('info')} className={navItemClass('info')}>
-                            Resumen
-                            {activeTab === 'info' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary animate-in slide-in-from-left-full duration-500" />}
-                        </button>
-                        <button onClick={() => setActiveTab('attachments')} className={navItemClass('attachments')}>
-                            Recursos ({course.attachments?.length || 0})
-                            {activeTab === 'attachments' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary animate-in slide-in-from-left-full duration-500" />}
-                        </button>
-                        <button onClick={() => setActiveTab('questions')} className={navItemClass('questions')}>
-                            Consultas ({course.questions?.length || 0})
-                            {activeTab === 'questions' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary animate-in slide-in-from-left-full duration-500" />}
-                        </button>
+                        <button onClick={() => setActiveTab('info')} className={navItemClass('info')}>Resumen {activeTab === 'info' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary" />}</button>
+                        <button onClick={() => setActiveTab('attachments')} className={navItemClass('attachments')}>Recursos ({course.attachments?.length || 0}) {activeTab === 'attachments' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary" />}</button>
+                        <button onClick={() => setActiveTab('questions')} className={navItemClass('questions')}>Consultas ({course.questions?.length || 0}) {activeTab === 'questions' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary" />}</button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-10 scrollbar-thin scrollbar-thumb-outline-variant/20 scrollbar-track-transparent">
-                        {/* 1. INFO TAB: Editorial Layout */}
+                    <div className="flex-1 overflow-y-auto p-10">
                         {activeTab === 'info' && (
                             <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <section>
-                                    <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
-                                        <Info size={14} /> Sinopsis del Programa
-                                    </h3>
-                                    <p className="text-on-surface-variant text-lg font-medium leading-relaxed opacity-80">
-                                        {course.description || "Este programa académico está diseñado para potenciar las habilidades críticas en el área seleccionada, siguiendo los estándares internacionales de educación técnica y superior."}
-                                    </p>
+                                    <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-6 flex items-center gap-2"><Info size={14} /> Sinopsis del Programa</h3>
+                                    <p className="text-on-surface-variant text-lg font-medium leading-relaxed opacity-80">{course.description || "Sin descripción disponible."}</p>
                                 </section>
 
                                 <div className="grid grid-cols-2 gap-8">
-                                    <div className="bg-white p-6 rounded-3xl ghost-border flex items-center gap-4 group hover:shadow-xl transition-all">
-                                        <div className="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                                            <CalendarDays size={20} />
-                                        </div>
+                                    <div className="bg-white p-6 rounded-3xl ghost-border flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600"><CalendarDays size={20} /></div>
                                         <div>
-                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Fecha Estimada</p>
-                                            <p className="font-headline font-bold text-primary">
-                                                {course.start_date ? new Date(course.start_date).toLocaleDateString('es-ES', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Próxima convocat.'}
-                                            </p>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Inicio</p>
+                                            <p className="font-headline font-bold text-blue-600">{course.start_date ? new Date(course.start_date).toLocaleDateString() : 'Pendiente'}</p>
                                         </div>
                                     </div>
-                                    <div className="bg-white p-6 rounded-3xl ghost-border flex items-center gap-4 group hover:shadow-xl transition-all">
-                                        <div className="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                                            <Layers size={20} />
-                                        </div>
+                                    <div className="bg-white p-6 rounded-3xl ghost-border flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600"><Clock size={20} /></div>
                                         <div>
-                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Nivel de Cargo</p>
-                                            <p className="font-headline font-bold text-primary uppercase tracking-tight">Postgrado / Senior</p>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Duración</p>
+                                            <p className="font-headline font-bold text-purple-600">{course.duration || 'Por definir'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-3xl ghost-border flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600"><MapPin size={20} /></div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Ciudades</p>
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {Array.isArray(course.practice_city) ? course.practice_city.map((c, i) => <span key={i} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black">{c}</span>) : course.practice_city}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-3xl ghost-border flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600"><Tag size={20} /></div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Inversión Final (Desc.)</p>
+                                            <p className="font-headline font-bold text-orange-600">
+                                                {course.discount && course.discount > 0 ? (
+                                                    <>
+                                                        S/ {(Number(course.price || 0) * (1 - Number(course.discount) / 100)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                                                        <span className="text-[9px] ml-1 bg-orange-100 px-1 rounded">-{course.discount}%</span>
+                                                    </>
+                                                ) : 'N/A'}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <footer className="bg-surface-container-low/50 p-6 rounded-3xl border border-dashed border-outline-variant/30 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-full primary-gradient flex items-center justify-center text-white font-bold">
+                                <section>
+                                    <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-4 flex items-center gap-2"><Clock size={14} className="text-purple-500" /> Horarios de Clase</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {course.schedules?.map((s, i) => (
+                                            <div key={i} className="p-4 bg-purple-50/30 border border-purple-100/50 rounded-2xl text-[11px] font-bold text-gray-600 flex items-center gap-3">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-purple-500" /> {s}
+                                            </div>
+                                        ))}
+                                        {(!course.schedules || course.schedules.length === 0) && <p className="text-[10px] font-bold text-gray-400 italic">No hay horarios definidos.</p>}
+                                    </div>
+                                </section>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
+                                    <section>
+                                        <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                                            <CheckSquare size={14} className="text-orange-500" /> Certificaciones
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {course.catalog_items?.filter(i => i.type === 'certificate').map((c, i) => (
+                                                <div key={`cat-${i}`} className="flex items-center gap-4 text-xs font-bold text-primary bg-orange-50/50 p-4 rounded-2xl border border-orange-100">
+                                                    {c.image && <img src={`/storage/${c.image}`} className="w-10 h-10 object-contain rounded-xl bg-white p-1" />}
+                                                    <span className="truncate">{c.name}</span>
+                                                </div>
+                                            ))}
+                                            {(!course.catalog_items?.some(i => i.type === 'certificate')) && (
+                                                <p className="text-[10px] font-bold text-gray-400 italic bg-gray-50 p-4 rounded-2xl border border-dashed text-center">Certificado institucional estándar incluido.</p>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    {course.catalog_items?.some(i => i.type === 'endorsement') && (
+                                        <section>
+                                            <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                                                <Award size={14} className="text-yellow-500" /> Avalado por
+                                            </h3>
+                                            <div className="flex flex-wrap gap-4">
+                                                {course.catalog_items?.filter(i => i.type === 'endorsement').map((a, i) => (
+                                                    <div key={`cat-a-${i}`} className="bg-yellow-50 p-4 rounded-3xl border border-yellow-100 flex items-center gap-4 transition-all hover:scale-105">
+                                                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center p-2 border border-yellow-100 shadow-sm shrink-0">
+                                                            {a.image ? <img src={`/storage/${a.image}`} className="w-full h-full object-contain" /> : <Award size={24} className="text-yellow-500" />}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-black text-primary leading-tight">{a.name}</p>
+                                                            <p className="text-[8px] font-bold text-yellow-600 uppercase tracking-widest mt-0.5 whitespace-nowrap">Aval Institucional</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+                                </div>
+
+                                {course.catalog_items?.some(i => i.type === 'sponsorship') && (
+                                    <section>
+                                        <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                                            <ShieldCheck size={14} className="text-cyan-500" /> Auspicios Institucionales
+                                        </h3>
+                                        <div className="flex flex-wrap gap-4">
+                                            {course.catalog_items?.filter(i => i.type === 'sponsorship').map((a, i) => (
+                                                <div key={`cat-s-${i}`} className="bg-cyan-50 p-4 rounded-3xl border border-cyan-100 flex items-center gap-4 transition-all hover:scale-105">
+                                                    <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center p-2 border border-cyan-100 shadow-sm shrink-0">
+                                                        {a.image ? <img src={`/storage/${a.image}`} className="w-full h-full object-contain" /> : <ShieldCheck size={24} className="text-cyan-500" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-black text-primary leading-tight">{a.name}</p>
+                                                        <p className="text-[8px] font-bold text-cyan-600 uppercase tracking-widest mt-0.5 whitespace-nowrap">Auspicio Oficial</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Suggested Plan (Reference) */}
+                                    <section className="bg-indigo-50/50 border border-indigo-100/50 p-6 rounded-[2.5rem] space-y-4 shadow-sm relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 p-3">
+                                            <div className="bg-indigo-600 text-white text-[7px] font-black px-2 py-0.5 rounded-full tracking-widest uppercase shadow-sm">Referencia</div>
+                                        </div>
+                                        <h3 className="text-[10px] font-black text-indigo-900/40 uppercase tracking-[0.2em] flex items-center gap-2">
+                                            <CreditCard size={14} className="text-indigo-600" /> Plan Sugerido
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <p className="text-[9px] font-black text-indigo-600/50 uppercase tracking-widest mb-1">Inversión / Matrícula</p>
+                                                <p className="text-xl font-headline font-black text-indigo-900">
+                                                    S/ {Number(course.enrollment_value || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                                                    {Number(course.discount || 0) > 0 && (
+                                                        <span className="text-[10px] text-emerald-600 font-bold ml-2">(-{course.discount}%)</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <div className="pt-4 border-t border-indigo-100/30">
+                                                <p className="text-[9px] font-black text-indigo-600/50 uppercase tracking-widest mb-1">Fraccionamiento</p>
+                                                <p className="text-xl font-headline font-black text-indigo-900 flex items-baseline gap-2">
+                                                    {course.installments_count || 0} 
+                                                    <span className="text-[10px] font-bold text-indigo-400 uppercase">Cuotas de</span>
+                                                    <span className="text-lg">S/ {Number(course.installment_value || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    {/* Minimum Plan */}
+                                    <section className="bg-rose-50/30 border border-rose-100/30 p-6 rounded-[2.5rem] space-y-4 shadow-sm relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 p-3">
+                                            <div className="bg-rose-600 text-white text-[7px] font-black px-2 py-0.5 rounded-full tracking-widest uppercase shadow-sm">Mínimo</div>
+                                        </div>
+                                        <h3 className="text-[10px] font-black text-rose-900/40 uppercase tracking-[0.2em] flex items-center gap-2">
+                                            <Activity size={14} className="text-rose-600" /> Límite de Venta
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <p className="text-[9px] font-black text-rose-600/50 uppercase tracking-widest mb-1">Inversión Mínima</p>
+                                                <p className="text-xl font-headline font-black text-rose-900">S/ {Number(course.min_price || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+                                            </div>
+                                            <div className="pt-4 border-t border-rose-100/20">
+                                                <p className="text-[9px] font-black text-rose-600/50 uppercase tracking-widest mb-1">Cuotas Mínimas</p>
+                                                <p className="text-xl font-headline font-black text-rose-900 flex items-baseline gap-2">
+                                                    {course.installments_count || 0} 
+                                                    <span className="text-[10px] font-bold text-rose-400 uppercase">Cuotas de</span>
+                                                    <span className="text-lg">S/ {Number(course.min_installment_value || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+
+                                <div className="flex items-center gap-3 p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100/20">
+                                    <div className="p-2 bg-white rounded-xl shadow-sm">
+                                        <Info size={16} className="text-indigo-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-indigo-900/80 uppercase tracking-tight">Financiamiento Dinámico</p>
+                                        <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-tighter leading-tight">
+                                            El sistema calcula automáticamente las cuotas según el número definido. Los asesores deben respetar el Plan Mínimo como límite inferior.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <footer className="bg-surface-container-low/50 p-8 rounded-[2.5rem] border border-dashed border-outline-variant/30 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="flex items-center gap-3 md:col-span-1">
+                                        <div className="h-10 w-10 rounded-full primary-gradient flex items-center justify-center text-white font-bold shadow-lg">
                                             {course.creator?.name?.charAt(0) || 'U'}
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest leading-none">Creado por Administrador</p>
+                                            <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest leading-none">Administrador</p>
                                             <p className="text-xs font-bold text-primary mt-1">{course.creator?.name || 'Staff ICEP'}</p>
                                         </div>
                                     </div>
+                                    <div className="text-center md:border-x md:border-outline-variant/20 px-4">
+                                        <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest leading-none">Inversión Mínima</p>
+                                        <p className="font-headline font-bold text-on-surface-variant/70 mt-1 text-base">S/ {Number(course.min_price || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+                                    </div>
                                     <div className="text-right">
-                                        <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest leading-none">Inversion Institucional</p>
-                                        <p className="font-headline font-bold text-primary mt-1 text-lg">S/ {Number(course.price).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+                                        <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest leading-none">Total Referencia</p>
+                                        <p className="font-headline font-bold text-primary mt-1 text-2xl">S/ {Number(course.price).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
                                     </div>
                                 </footer>
                             </div>
                         )}
 
-                        {/* 2. ATTACHMENTS TAB: High-end Resource List */}
                         {activeTab === 'attachments' && (
-                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                {isJefe && (
-                                    <div className="bg-white rounded-3xl p-8 space-y-6 ghost-border shadow-xl shadow-black/5">
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Cargar Nuevo Recurso</h3>
-                                            <div className="flex bg-surface-container-low p-1 rounded-xl">
-                                                <button onClick={() => setAttType('file')} className={`px-4 py-1.5 text-[10px] font-bold rounded-lg transition-all ${attType === 'file' ? 'bg-primary text-white shadow-lg' : 'text-on-surface-variant/60 hover:text-primary'}`}>LOCAL</button>
-                                                <button onClick={() => setAttType('url')} className={`px-4 py-1.5 text-[10px] font-bold rounded-lg transition-all ${attType === 'url' ? 'bg-primary text-white shadow-lg' : 'text-on-surface-variant/60 hover:text-primary'}`}>NUBE / URL</button>
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="grid gap-4">
+                                    {course.attachments?.map(att => (
+                                        <div key={att.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-primary/5 text-primary flex items-center justify-center">{att.type === 'url' ? <Link2 size={18} /> : <FileText size={18} />}</div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-primary">{att.name}</p>
+                                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{att.type}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={() => {
+                                                        const url = att.type === 'url' ? att.url : (att.path ? `/storage/${att.path}` : null);
+                                                        if (!url) return;
+                                                        
+                                                        if (att.type === 'url') window.open(url, '_blank');
+                                                        else {
+                                                            const isPdf = att.path?.toLowerCase().endsWith('.pdf');
+                                                            const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(att.path || '');
+                                                            if (isPdf || isImage) setPreviewResource({ url: url, type: isPdf ? 'pdf' : 'image', name: att.name });
+                                                            else window.open(url, '_blank');
+                                                        }
+                                                    }}
+                                                    className="p-2.5 bg-gray-50 text-primary rounded-xl hover:bg-primary hover:text-white transition shadow-sm"
+                                                >
+                                                    <Eye size={16} />
+                                                </button>
+                                                {isJefe && <button onClick={() => handleDeleteAttachment(att.id)} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button>}
                                             </div>
                                         </div>
-                                        
-                                        <div className="space-y-4">
-                                            <input 
-                                                type="text" 
-                                                placeholder="Ej: Silabo del Curso 2024 (Requerido)" 
-                                                value={attName} 
-                                                onChange={e => setAttName(e.target.value)}
-                                                className="w-full bg-surface-container-low border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-on-surface-variant/30" 
-                                            />
-                                            
-                                            {attType === 'file' ? (
-                                                <div className="relative group">
-                                                    <input 
-                                                        type="file" 
-                                                        onChange={e => setAttFile(e.target.files?.[0] || null)}
-                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                                                    />
-                                                    <div className="bg-surface-container-low/50 border-2 border-dashed border-outline-variant/30 rounded-2xl p-6 text-center group-hover:bg-white group-hover:border-primary/20 transition-all">
-                                                        <Plus size={24} className="mx-auto mb-2 text-on-surface-variant/40" />
-                                                        <p className="text-xs font-bold text-on-surface-variant/60 uppercase tracking-widest">
-                                                            {attFile ? attFile.name : 'Haz clic para seleccionar un archivo'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <input 
-                                                    type="url" 
-                                                    placeholder="https://drive.google.com/..." 
-                                                    value={attUrl} 
-                                                    onChange={e => setAttUrl(e.target.value)}
-                                                    className="w-full bg-surface-container-low border-none rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-primary/10 transition-all" 
-                                                />
-                                            )}
-                                        </div>
-                                        
-                                        <button 
-                                            onClick={handleAddAttachment} 
-                                            disabled={savingAtt || !attName.trim()}
-                                            className="w-full py-4 bg-primary text-tertiary-fixed rounded-2xl font-black text-xs uppercase tracking-[0.3em] hover:shadow-2xl hover:shadow-primary/20 transition-all active:scale-95 disabled:opacity-30"
-                                        >
-                                            {savingAtt ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Confirmar Carga'}
-                                        </button>
-                                    </div>
-                                )}
-
-                                <div className="space-y-4">
-                                    <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-4">Materiales Disponibles</h3>
-                                    {course.attachments?.length === 0 ? (
-                                        <div className="text-center py-12 bg-white rounded-3xl ghost-border">
-                                            <Sparkles size={32} className="mx-auto mb-3 text-on-surface-variant/20" />
-                                            <p className="text-xs font-bold text-on-surface-variant/40 uppercase tracking-widest">No hay recursos vinculados aún.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="grid gap-3">
-                                            {course.attachments?.map(att => (
-                                                <div key={att.id} className="flex items-center justify-between p-5 bg-white rounded-2xl ghost-border hover:bg-surface-container-low/50 hover:shadow-lg transition-all group/item">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${att.type === 'url' ? 'bg-secondary-container text-on-secondary-container' : 'bg-primary text-tertiary-fixed'}`}>
-                                                            {att.type === 'url' ? <Link2 size={20} /> : <FileText size={20} />}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-bold text-primary tracking-tight">{att.name}</p>
-                                                            <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">{att.type === 'file' ? 'Archivo Institucional' : 'Recurso Externo'}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <a 
-                                                            href={att.type === 'url' ? (att.url || '#') : (att.path ? `/storage/${att.path}` : '#')} 
-                                                            target="_blank" 
-                                                            rel="noreferrer"
-                                                            className="p-3 bg-surface-container-low text-primary rounded-xl hover:bg-primary hover:text-white transition-all shadow-sm"
-                                                        >
-                                                            {att.type === 'url' ? <ExternalLink size={18} /> : <Download size={18} />}
-                                                        </a>
-                                                        {isJefe && (
-                                                            <button 
-                                                                onClick={() => handleDeleteAttachment(att.id)}
-                                                                className="p-3 bg-error/5 text-error rounded-xl hover:bg-error hover:text-white transition-all opacity-0 group-hover/item:opacity-100"
-                                                            >
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                    ))}
+                                    {course.attachments?.length === 0 && <p className="text-center py-10 text-xs text-gray-400 italic font-bold uppercase tracking-widest">No hay recursos vinculados.</p>}
                                 </div>
                             </div>
                         )}
 
-                        {/* 3. QUESTIONS TAB: High-end Inquiry Log */}
                         {activeTab === 'questions' && (
-                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pr-1">
-                                {!isJefe && (
-                                    <div className="bg-primary-container p-8 rounded-3xl text-white relative overflow-hidden group">
-                                        <div className="relative z-10 space-y-6">
-                                            <div className="flex items-center gap-3">
-                                              <MessageSquare className="text-tertiary-fixed" />
-                                              <h3 className="font-headline font-extrabold text-xl">¿Tienes una duda técnica?</h3>
-                                            </div>
-                                            <textarea
-                                                value={questionText}
-                                                onChange={e => setQuestionText(e.target.value)}
-                                                rows={4}
-                                                placeholder="Describe tu consulta aquí. Los encargados responderán a la brevedad..."
-                                                className="w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 text-sm text-white placeholder:text-white/30 outline-none focus:bg-white/20 transition-all font-medium"
-                                            />
-                                            <button 
-                                                onClick={handleAskQuestion} 
-                                                disabled={savingQ || !questionText.trim()}
-                                                className="bg-tertiary-fixed text-on-tertiary-fixed font-black text-[10px] uppercase tracking-[0.2em] px-8 py-4 rounded-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-30 shadow-xl shadow-black/20"
-                                            >
-                                                {savingQ ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Despachar Consulta'}
-                                            </button>
-                                        </div>
-                                        <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:rotate-12 transition-transform duration-1000">
-                                          <HelpCircle size={160} />
-                                        </div>
-                                    </div>
-                                )}
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="bg-primary/5 p-8 rounded-3xl border border-dashed border-primary/20">
+                                    <h3 className="font-headline font-black text-primary text-xl mb-4">Pregunta algo sobre este curso</h3>
+                                    <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} rows={3} className="w-full bg-white border-0 rounded-2xl p-4 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 mb-4" placeholder="Escribe tu consulta..." />
+                                    <button onClick={handleAskQuestion} disabled={savingQ || !questionText.trim()} className="px-8 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20">Enviar Consulta</button>
+                                </div>
 
-                                <div className="space-y-6">
-                                    <h3 className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.3em] mb-4">Registro Histórico de Consultas</h3>
-                                    {course.questions?.length === 0 ? (
-                                        <div className="text-center py-20 bg-white rounded-[2.5rem] ghost-border flex flex-col items-center">
-                                            <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center mb-4 text-on-surface-variant/20">
-                                              <MessageSquare size={32} />
-                                            </div>
-                                            <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Aún no se han registrado consultas para este curso.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="grid gap-6">
-                                            {course.questions?.map(q => (
-                                                <div key={q.id} className="group/q">
-                                                    <div className={`p-8 rounded-[2rem] bg-white ghost-border hover:shadow-xl transition-all duration-500 relative ${q.status === 'pending' ? 'border-l-8 border-l-on-primary-container' : 'border-l-8 border-l-tertiary-fixed'}`}>
-                                                        <div className="flex justify-between items-start mb-6">
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="h-10 w-10 rounded-full primary-gradient flex items-center justify-center text-white font-bold shadow-sm">
-                                                                    {q.asker?.name?.charAt(0)}
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-primary tracking-tight leading-none mb-1">{q.asker?.name}</p>
-                                                                    <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
-                                                                        {new Date(q.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="status-jewel shadow-sm">
-                                                                <div className={`status-dot ${q.status === 'pending' ? 'bg-on-primary-container animate-pulse' : 'bg-tertiary-fixed'}`} />
-                                                                <span className="text-[8px] font-black text-on-surface-variant uppercase tracking-[0.2em]">{q.status === 'pending' ? 'EN ESPERA' : 'RESUELTO'}</span>
-                                                            </div>
-                                                        </div>
-                                                        <p className="text-on-surface-variant font-medium leading-relaxed italic border-l-4 border-surface-container-high pl-6 mb-8 group-hover/q:text-primary transition-colors">
-                                                            "{q.question}"
-                                                        </p>
-
-                                                        {q.answer && (
-                                                            <div className="bg-surface-container-low/50 p-6 rounded-2xl animate-in slide-in-from-top-4 duration-500">
-                                                                <div className="flex items-center gap-2 mb-3">
-                                                                    <Sparkles size={14} className="text-on-tertiary-container" />
-                                                                    <p className="text-[10px] font-black text-on-tertiary-container uppercase tracking-widest">Respuesta del Secretario Académico</p>
-                                                                </div>
-                                                                <p className="text-sm text-on-surface-variant font-bold leading-relaxed">{q.answer}</p>
-                                                            </div>
-                                                        )}
-
-                                                        {isJefe && q.status === 'pending' && (
-                                                            <div className="mt-8 pt-8 border-t border-outline-variant/10">
-                                                                {expandedQ === q.id ? (
-                                                                    <div className="space-y-4 animate-in fade-in zoom-in-95">
-                                                                        <textarea 
-                                                                            value={answerText} 
-                                                                            onChange={e => setAnswerText(e.target.value)} 
-                                                                            rows={3}
-                                                                            placeholder="Redacta la respuesta oficial de la institución..."
-                                                                            className="w-full bg-surface-container-low border-2 border-primary/20 rounded-2xl p-5 text-sm font-medium focus:ring-4 focus:ring-primary/5 outline-none transition-all" 
-                                                                        />
-                                                                        <div className="flex gap-3 justify-end">
-                                                                            <button onClick={() => setExpandedQ(null)} className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors">Abortar</button>
-                                                                            <button 
-                                                                                onClick={() => handleAnswerQuestion(q.id)} 
-                                                                                disabled={savingAnswer || !answerText.trim()}
-                                                                                className="px-8 py-3 bg-primary text-tertiary-fixed rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
-                                                                            >
-                                                                                {savingAnswer ? <Loader2 size={14} className="animate-spin" /> : 'Publicar Respuesta'}
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <button 
-                                                                        onClick={() => { setExpandedQ(q.id); setAnswerText(''); }}
-                                                                        className="w-full py-4 bg-primary/5 text-primary text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-3 px-8"
-                                                                    >
-                                                                        Atender Consulta <ArrowRight size={14} />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )}
+                                <div className="space-y-4">
+                                    {course.questions?.map(q => (
+                                        <div key={q.id} className="p-6 bg-white border rounded-[2rem] space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">{q.asker?.name?.[0]}</div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-primary">{q.asker?.name}</p>
+                                                        <p className="text-[9px] font-bold text-gray-400">{new Date(q.created_at).toLocaleDateString()}</p>
                                                     </div>
                                                 </div>
-                                            ))}
+                                                <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase ${q.status === 'pending' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'}`}>{q.status}</span>
+                                            </div>
+                                            <p className="text-on-surface-variant font-medium leading-relaxed italic border-l-4 pl-4">"{q.question}"</p>
+                                            {q.answer && <div className="bg-gray-50 p-4 rounded-2xl border"><p className="text-[9px] font-black primary uppercase mb-1">Respuesta Académica</p><p className="text-sm text-on-surface-variant font-bold">{q.answer}</p></div>}
+                                            {isJefe && q.status === 'pending' && (
+                                                <div className="pt-4 border-t space-y-3">
+                                                    <textarea value={answerText} onChange={e => setAnswerText(e.target.value)} rows={2} className="w-full bg-gray-50 border-0 rounded-xl p-3 text-sm" placeholder="Respuesta..." />
+                                                    <button onClick={() => handleAnswerQuestion(q.id)} className="px-4 py-2 bg-primary text-white rounded-lg text-[9px] font-black uppercase">Responder</button>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
+
+            {previewResource && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-10 animate-in fade-in duration-300">
+                    <div className="relative w-full h-full max-w-5xl bg-white rounded-[2rem] overflow-hidden shadow-2xl flex flex-col">
+                        <div className="flex justify-between items-center px-8 py-4 border-b">
+                            <h2 className="font-bold text-primary">{previewResource.name}</h2>
+                            <div className="flex gap-2">
+                                <a href={previewResource.url} download className="p-2 bg-gray-50 rounded-xl text-primary"><Download size={20} /></a>
+                                <button onClick={() => setPreviewResource(null)} className="p-2 bg-red-50 text-red-500 rounded-xl ml-4"><X size={20} /></button>
+                            </div>
+                        </div>
+                        <div className="flex-1 bg-gray-100 flex items-center justify-center overflow-hidden">
+                            {previewResource.type === 'pdf' ? <iframe src={previewResource.url} className="w-full h-full" /> : <img src={previewResource.url} className="max-w-full max-h-full object-contain" />}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

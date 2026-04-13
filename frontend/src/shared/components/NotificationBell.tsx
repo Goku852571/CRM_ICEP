@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bell, Check, BellDot, Ticket, FileText, Calendar as CalendarIcon, Info, Sparkles } from 'lucide-react';
+import { Bell, Check, BellDot, Ticket, FileText, Calendar as CalendarIcon, Info, Sparkles, CreditCard, CheckCircle2 } from 'lucide-react';
 import { useNotifications, Notification } from '../hooks/useNotifications';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,6 +7,8 @@ const IconMap: Record<string, any> = {
   ticket_assigned: Ticket,
   ticket_status: Ticket,
   enrollment_completed: FileText,
+  payment_requested: CreditCard,
+  payment_confirmed: CheckCircle2,
   calendar_event: CalendarIcon,
   default: Info
 };
@@ -31,6 +33,8 @@ export default function NotificationBell() {
         navigate('/tickets', { state: { selectedTicketId: ticket_id } });
         break;
       case 'enrollment_completed':
+      case 'payment_requested':
+      case 'payment_confirmed':
         navigate('/enrollments', { state: { selectedEnrollmentId: enrollment_id } });
         break;
       case 'calendar_event':

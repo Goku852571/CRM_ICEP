@@ -30,9 +30,11 @@ export interface Lead {
   course_interest_id: number | null;
   advisor_id: number | null;
   created_at: string;
+  updated_at: string;
   course?: { id: number; name: string };
   advisor?: { id: number; name: string };
   interactions?: LeadInteraction[];
+  enrollment?: { id: number; uuid: string; status: string };
 }
 
 export const getLeads = async (params?: Record<string, any>) => {

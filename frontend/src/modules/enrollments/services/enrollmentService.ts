@@ -8,22 +8,56 @@ export interface EnrollmentForm {
   student_phone: string | null;
   student_city: string | null;
   student_id_number: string | null;
-  status: 'pending_send' | 'sent' | 'completed' | 'in_review' | 'approved' | 'incomplete' | 'void';
+  status: 'pending_send' | 'sent' | 'completed' | 'payment_pending' | 'payment_confirmed' | 'in_review' | 'approved' | 'incomplete' | 'void';
   advisor_id: number;
   course_id: number;
   created_at: string;
   sent_at: string | null;
   completed_at: string | null;
   reviewed_at: string | null;
+  // Payment fields
+  bank_transaction_id: string | null;
+  payment_voucher_path: string | null;
+  payment_requested_to: number | null;
+  payment_confirmed_by: number | null;
+  payment_confirmed_at: string | null;
+  // Financial / audit fields
+  sale_value: number | null;
+  requires_billing: boolean;
+  bank_name: string | null;
+  payment_concept: string | null;
+  total_paid: number;
+  balance_due: number | null;
   advisor?: { id: number; name: string };
-  course?: { id: number; name: string; code?: string };
+  course?: { id: number; name: string; code?: string; enrollment_value?: number; installments_count?: number; installment_value?: number };
   histories?: any[];
+  paymentRequestedTo?: { id: number; name: string; avatar?: string | null };
+  paymentConfirmedBy?: { id: number; name: string; avatar?: string | null };
+}
+
+export interface AuditSummary {
+  total_records: number;
+  total_sale_value: number;
+  total_paid: number;
+  total_balance_due: number;
+  billing_count: number;
+  payment_confirmed: number;
 }
 
 export interface Course {
   id: number;
   name: string;
   code?: string;
+  enrollment_value?: number;
+  installments_count?: number;
+  installment_value?: number;
+}
+
+export interface Jefe {
+  id: number;
+  name: string;
+  email: string;
+  avatar?: string | null;
 }
 
 export const getEnrollments = async (filters: any = {}) => {
@@ -51,7 +85,95 @@ export const getCourses = async () => {
   return response.data;
 };
 
-// Public Routes
+export const exportEnrollments = async (filters: any = {}) => {
+  const response = await api.get('/enrollments/export', {
+    params: filters,
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
+/** Obtiene la lista de usuarios con rol jefe/admin (para envío del comprobante) */
+export const getJefes = async (): Promise<Jefe[]> => {
+  const response = await api.get('/users/jefes');
+  return response.data.data;
+};
+
+/** Asesor sube comprobante de pago */
+export const submitPaymentVoucher = async (
+  enrollmentId: number,
+  bankTransactionId: string,
+  paymentConcept: string,
+  voucherFile: File,
+  paymentRequestedTo: number
+) => {
+  const formData = new FormData();
+  formData.append('bank_transaction_id', bankTransactionId);
+  formData.append('payment_concept', paymentConcept);
+  formData.append('payment_voucher', voucherFile);
+  formData.append('payment_requested_to', String(paymentRequestedTo));
+  const response = await api.post(`/enrollments/${enrollmentId}/payment`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
+/** Jefe confirma o rechaza el pago */
+export const confirmPayment = async (
+  enrollmentId: number,
+  action: 'confirm' | 'reject',
+  notes?: string
+) => {
+  const response = await api.post(`/enrollments/${enrollmentId}/confirm-payment`, { action, notes });
+  return response.data;
+};
+
+// ── AUDITORÍA FINANCIERA ─────────────────────────────────────────────────────
+
+/** Obtiene el listado de matrículas con datos financieros para el jefe/admin */
+export const getEnrollmentAuditData = async (filters: {
+  start_date?: string;
+  end_date?: string;
+  advisor_id?: number;
+  status?: string;
+  requires_billing?: boolean;
+} = {}): Promise<{ data: EnrollmentForm[]; summary: AuditSummary }> => {
+  const response = await api.get('/sales/enrollment-audit', { params: filters });
+  return response.data;
+};
+
+/** Actualización inline de datos financieros (solo jefe/admin) */
+export const updateEnrollmentFinancials = async (
+  id: number,
+  payload: {
+    sale_value?: number | null;
+    requires_billing?: boolean;
+    bank_name?: string | null;
+    payment_concept?: string | null;
+    total_paid?: number | null;
+  }
+) => {
+  const response = await api.patch(`/sales/enrollments/${id}/financials`, payload);
+  return response.data;
+};
+
+/** Descarga el CSV de control de matrículas con formato del Excel original */
+export const exportDetailedReport = async (filters: { start_date?: string; end_date?: string } = {}) => {
+  const response = await api.get('/sales/enrollment-audit/export', {
+    params: filters,
+    responseType: 'blob',
+  });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `control_matriculas_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+// ── Public Routes ────────────────────────────────────────────────────────────
 export const getPublicEnrollment = async (uuid: string) => {
   const response = await api.get(`/public/enrollments/${uuid}`);
   return response.data;

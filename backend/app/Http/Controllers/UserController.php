@@ -98,6 +98,17 @@ class UserController extends ApiController
     }
 
     /**
+     * Returns users with the 'jefe' role for payment verification assignment.
+     */
+    public function getJefes(): JsonResponse
+    {
+        $jefes = User::whereHas('roles', fn($q) => $q->whereIn('name', ['jefe', 'admin']))
+            ->select('id', 'name', 'email', 'avatar')
+            ->get();
+        return $this->success($jefes, 'Jefes recuperados');
+    }
+
+    /**
      * Remove the specified user.
      */
     public function destroy(User $user): JsonResponse

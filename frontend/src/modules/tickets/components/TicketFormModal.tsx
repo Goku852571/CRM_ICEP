@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Area, createTicket } from '../services/ticketService';
-import { X } from 'lucide-react';
+import { User as AppUser } from '@/modules/users/services/userService';
+import { X, Paperclip, User as UserIcon } from 'lucide-react';
 
 const ticketSchema = z.object({
   title: z.string().min(3, 'El título debe tener al menos 3 caracteres').max(255),
   description: z.string().min(10, 'La descripción debe ser detallada (min 10 caracteres)'),
-  area_id: z.string().min(1, 'Debes seleccionar un área destino'),
+  assignee_id: z.string().optional(),
   priority: z.enum(['normal', 'urgent', 'priority']).default('normal'),
 });
 
@@ -16,27 +17,43 @@ type TicketFormValues = z.infer<typeof ticketSchema>;
 
 interface Props {
   areas: Area[];
+  users: AppUser[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function TicketFormModal({ areas, onClose, onSuccess }: Props) {
+export default function TicketFormModal({ areas, users, onClose, onSuccess }: Props) {
   const [apiError, setApiError] = useState('');
+  const [ticketFiles, setTicketFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<TicketFormValues>({
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setTicketFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setTicketFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
       priority: 'normal'
     }
   });
 
+  const selectedAssigneeId = watch('assignee_id');
+
   const onSubmit = async (data: TicketFormValues) => {
     try {
       setApiError('');
       await createTicket({
         ...data,
-        area_id: parseInt(data.area_id)
-      });
+        area_id: areas[0]?.id || 1, // Default area as requested to remove from UI
+        assignee_id: data.assignee_id ? parseInt(data.assignee_id) : null
+      }, ticketFiles);
       onSuccess();
     } catch (error: any) {
       setApiError(error.response?.data?.message || 'Error al crear el ticket');
@@ -71,31 +88,50 @@ export default function TicketFormModal({ areas, onClose, onSuccess }: Props) {
             {errors.title && <span className="text-xs text-red-500 font-medium mt-1 inline-block">{errors.title.message}</span>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Área Destino</label>
-              <select
-                {...register('area_id')}
-                className={`w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-colors ${errors.area_id ? 'border-red-500' : 'border-gray-200'}`}
+          <div className="space-y-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Asignar Responsable (opcional)</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setValue('assignee_id', '')}
+                className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all ${!selectedAssigneeId ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
               >
-                <option value="">Selecciona un área...</option>
-                {areas.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-              {errors.area_id && <span className="text-xs text-red-500 font-medium mt-1 inline-block">{errors.area_id.message}</span>}
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 mb-2 border-2 border-white shadow-sm">
+                  ?
+                </div>
+                <span className="text-[10px] font-black uppercase text-gray-500">Sin asignar</span>
+              </button>
+
+              {users.map(u => (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => setValue('assignee_id', u.id.toString())}
+                  className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all ${selectedAssigneeId === u.id.toString() ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                >
+                  <div className="w-12 h-12 rounded-full overflow-hidden mb-2 border-2 border-white shadow-sm bg-gray-100 flex items-center justify-center">
+                    {u.avatar ? (
+                      <img src={u.avatar.startsWith('http') ? u.avatar : `/api/v1${u.avatar}`} alt={u.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-bold text-gray-500">{u.name.charAt(0)}</span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-black uppercase text-gray-700 text-center line-clamp-1">{u.name.split(' ')[0]}</span>
+                </button>
+              ))}
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Prioridad</label>
-              <select
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Prioridad</label>
+            <select
                 {...register('priority')}
                 className="w-full border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-colors"
-              >
+            >
                 <option value="normal">🟢 Normal</option>
                 <option value="urgent">🟠 Urgente</option>
                 <option value="priority">🔴 Prioridad Máxima</option>
-              </select>
-            </div>
+            </select>
           </div>
 
           <div>
@@ -107,6 +143,30 @@ export default function TicketFormModal({ areas, onClose, onSuccess }: Props) {
               className={`w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-100 bg-gray-50 focus:bg-white transition-colors resize-none ${errors.description ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
             />
             {errors.description && <span className="text-xs text-red-500 font-medium mt-1 inline-block">{errors.description.message}</span>}
+          </div>
+
+          <div>
+             <label className="block text-sm font-semibold text-gray-700 mb-1">Archivos Adjuntos (opcional)</label>
+             {ticketFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2 p-2 bg-gray-50 rounded-xl border border-gray-100">
+                  {ticketFiles.map((f, i) => (
+                    <span key={i} className="flex items-center gap-1 text-xs bg-white border border-gray-200 px-2 py-1 rounded-md shadow-sm">
+                      {f.name} 
+                      <button type="button" onClick={() => removeFile(i)} className="text-red-500 hover:text-red-700 font-bold ml-1"><X size={12}/></button>
+                    </span>
+                  ))}
+                </div>
+             )}
+             <div className="flex items-center gap-3">
+                <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()} 
+                  className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition text-sm font-medium w-full justify-center"
+                >
+                  <Paperclip size={16} /> Agregar Recursos (Imágenes / PDF)
+                </button>
+             </div>
           </div>
 
           <div className="pt-4 flex gap-3">

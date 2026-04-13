@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getDashboardStats, DashboardStats } from '../services/dashboardService';
+import EnrollmentReportModal from '../components/EnrollmentReportModal';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { 
   Users, 
@@ -44,6 +45,7 @@ export default function DashboardPage() {
   const isAdmin = hasRole('admin') || hasRole('jefe');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -297,14 +299,22 @@ export default function DashboardPage() {
               <p className="text-xs text-white/70 mb-8 leading-relaxed">
                 La ventana de Auditoría Institucional 2024 ya está abierta. Todos los datos de inscripción deben ser verificados y consolidados antes del viernes.
               </p>
-              <button className="bg-tertiary-fixed text-on-tertiary-fixed px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-white transition-all active:scale-95 shadow-xl shadow-black/20">
-                Iniciar Auditoría <ArrowRight size={16} />
+              <button 
+                onClick={() => setShowReportModal(true)}
+                className="bg-tertiary-fixed text-on-tertiary-fixed px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-white transition-all active:scale-95 shadow-xl shadow-black/20"
+              >
+                Generar Informe <ArrowRight size={16} />
               </button>
             </div>
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-tertiary-fixed/10 rounded-full blur-2xl -ml-12 -mb-12"></div>
             <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-on-primary-container/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
           </div>
+          )}
+
+          {/* Modal de Informe */}
+          {showReportModal && (
+            <EnrollmentReportModal onClose={() => setShowReportModal(false)} />
           )}
           
           {/* Quick Support Links */}

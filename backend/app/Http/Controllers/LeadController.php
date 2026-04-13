@@ -29,21 +29,21 @@ class LeadController extends Controller
 
         if ($request->has('period')) {
             $period = $request->period;
-            $startDate = \Carbon\Carbon::now()->startOfMonth();
-            $endDate = \Carbon\Carbon::now()->endOfMonth();
+            $startDate = Carbon::now()->startOfMonth();
+            $endDate = Carbon::now()->endOfMonth();
 
             switch ($period) {
                 case 'mes_pasado':
-                    $startDate = \Carbon\Carbon::now()->subMonth()->startOfMonth();
-                    $endDate = \Carbon\Carbon::now()->subMonth()->endOfMonth();
+                    $startDate = Carbon::now()->subMonth()->startOfMonth();
+                    $endDate = Carbon::now()->subMonth()->endOfMonth();
                     break;
                 case 'trimestre':
-                    $startDate = \Carbon\Carbon::now()->startOfQuarter();
-                    $endDate = \Carbon\Carbon::now()->endOfQuarter();
+                    $startDate = Carbon::now()->startOfQuarter();
+                    $endDate = Carbon::now()->endOfQuarter();
                     break;
                 case 'anio':
-                    $startDate = \Carbon\Carbon::now()->startOfYear();
-                    $endDate = \Carbon\Carbon::now()->endOfYear();
+                    $startDate = Carbon::now()->startOfYear();
+                    $endDate = Carbon::now()->endOfYear();
                     break;
             }
             $query->whereBetween('created_at', [$startDate, $endDate]);
@@ -51,8 +51,8 @@ class LeadController extends Controller
 
         if ($request->has('start_date') && $request->has('end_date')) {
             $query->whereBetween('created_at', [
-                \Carbon\Carbon::parse($request->start_date)->startOfDay(),
-                \Carbon\Carbon::parse($request->end_date)->endOfDay()
+                Carbon::parse($request->start_date)->startOfDay(),
+                Carbon::parse($request->end_date)->endOfDay()
             ]);
         }
 
@@ -75,7 +75,7 @@ class LeadController extends Controller
             return response()->json(['data' => $query->get()]);
         }
 
-        return $query->latest()->paginate($request->get('per_page', 15));
+        return $query->latest()->paginate($request->input('per_page', 15));
     }
 
     public function store(Request $request)
@@ -112,7 +112,7 @@ class LeadController extends Controller
 
     public function show(Request $request, $id)
     {
-        $lead = \App\Models\Lead::with(['course', 'advisor', 'interactions.user'])->findOrFail($id);
+        $lead = \App\Models\Lead::with(['course', 'advisor', 'interactions.user', 'enrollment'])->findOrFail($id);
         
         if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && $lead->advisor_id !== $request->user()->id) {
             return response()->json(['message' => 'No autorizado'], 403);

@@ -22,7 +22,8 @@ import {
   Tag,
   CheckCircle,
   Clock as ClockIcon,
-  PhoneCall
+  PhoneCall,
+  ClipboardList
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -42,6 +43,7 @@ import { getLeads, getLead, Lead } from '../services/leadService';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import EnrollmentAuditGrid from '@/modules/enrollments/components/EnrollmentAuditGrid';
 
 const COLORS = ['#008cc7', '#6ffbbe', '#f472b6', '#a78bfa', '#fbbf24'];
 
@@ -70,6 +72,7 @@ const INTERACTION_LABELS: Record<string, string> = {
 export default function SalesDashboardPage() {
   const { hasRole } = useAuth();
   
+  const [activeTab, setActiveTab] = useState<'kpis' | 'audit'>('kpis');
   const [period, setPeriod] = useState('este_mes');
   const [isExporting, setIsExporting] = useState(false);
   const [showActionPlan, setShowActionPlan] = useState(false);
@@ -439,36 +442,67 @@ export default function SalesDashboardPage() {
 
   return (
     <div className="p-8 space-y-10 animate-in fade-in duration-500 font-body">
-      {/* Header */}
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-4xl font-headline font-black text-primary tracking-tight">Análisis de Ventas</h1>
-          <p className="text-on-surface-variant/70 font-medium">Panel estratégico para supervisión y cumplimiento de metas comerciales</p>
-        </div>
-        <div className="flex gap-3">
-          <div className="relative inline-block">
-            <select 
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="appearance-none flex flex-row items-center gap-2 pl-10 pr-8 py-2 bg-surface-container-high rounded-xl text-sm font-bold border border-outline-variant/10 cursor-pointer hover:bg-surface-variant transition-colors"
-            >
-              <option value="este_mes">Este Mes</option>
-              <option value="mes_pasado">Mes Pasado</option>
-              <option value="trimestre">Trimestre Actual</option>
-              <option value="anio">Año Actual</option>
-            </select>
-            <Filter size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">▼</div>
+      {/* Header + Tab Navigation */}
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+          <div>
+            <h1 className="text-4xl font-headline font-black text-primary tracking-tight">Análisis de Ventas</h1>
+            <p className="text-on-surface-variant/70 font-medium">Panel estratégico para supervisión y cumplimiento de metas comerciales</p>
           </div>
-          <button 
-            onClick={handleExport}
-            disabled={isExporting}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
-          >
-            {isExporting ? 'Exportando...' : 'Exportar Reporte'}
-          </button>
+          {activeTab === 'kpis' && (
+            <div className="flex gap-3">
+              <div className="relative inline-block">
+                <select 
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value)}
+                  className="appearance-none flex flex-row items-center gap-2 pl-10 pr-8 py-2 bg-surface-container-high rounded-xl text-sm font-bold border border-outline-variant/10 cursor-pointer hover:bg-surface-variant transition-colors"
+                >
+                  <option value="este_mes">Este Mes</option>
+                  <option value="mes_pasado">Mes Pasado</option>
+                  <option value="trimestre">Trimestre Actual</option>
+                  <option value="anio">Año Actual</option>
+                </select>
+                <Filter size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">▼</div>
+              </div>
+              <button 
+                onClick={handleExport}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
+              >
+                {isExporting ? 'Exportando...' : 'Exportar Reporte'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 p-1 bg-surface-container-low rounded-2xl w-fit border border-outline-variant/10 shadow-inner">
+          {([
+            { key: 'kpis',  label: 'KPIs Estratégicos',       icon: TrendingUp },
+            { key: 'audit', label: 'Control de Matrículas',   icon: ClipboardList },
+          ] as const).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={clsx(
+                'flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-200 uppercase tracking-wider',
+                activeTab === tab.key
+                  ? 'bg-white text-primary shadow-md shadow-primary/10 scale-[1.02]'
+                  : 'text-on-surface-variant/60 hover:text-on-surface hover:bg-white/40',
+              )}
+            >
+              <tab.icon size={18} />
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
+
+      {activeTab === 'audit' && <EnrollmentAuditGrid />}
+
+      {activeTab === 'kpis' && (
+        <div className="space-y-10 animate-in fade-in duration-300">
 
       {/* Primary KPIs Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -687,6 +721,8 @@ export default function SalesDashboardPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

@@ -39,6 +39,19 @@ export interface Course {
     creator: { id: number; name: string } | null;
     attachments: CourseAttachment[];
     questions: CourseQuestion[];
+    practice_city?: string;
+    duration?: string;
+    min_price?: number;
+    discount?: number;
+    enrollment_value?: number;
+    installments_count?: number;
+    installment_value?: number;
+    min_installment_value?: number;
+    endorsements?: any[];
+    sponsorships?: any[];
+    certifications?: any[];
+    schedules?: any[];
+    catalog_items?: any[];
     created_at: string;
 }
 

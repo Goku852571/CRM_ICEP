@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getTickets, getAreas, Ticket, Area } from '../services/ticketService';
 import { Plus, Filter, MoreVertical, Clock, AlertCircle, TrendingUp, Activity, Zap, Ticket as TicketIcon, CheckCircle2 } from 'lucide-react';
 import TicketFormModal from '../components/TicketFormModal';
 import TicketDetailModal from '../components/TicketDetailModal';
 import { useAuth } from '@/shared/hooks/useAuth';
+import { getUsers, User as AppUser } from '@/modules/users/services/userService';
 
 const StatusMap: Record<string, { label: string, color: string }> = {
   open: { label: 'Abierto', color: 'bg-blue-100 text-blue-700' },
@@ -24,7 +25,9 @@ export default function TicketListPage() {
   const { hasPermission } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loading, setLoading] = useState(true);  // only true on FIRST load
+  const [refreshing, setRefreshing] = useState(false); // silent background refresh indicator
   
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -32,36 +35,58 @@ export default function TicketListPage() {
 
   // Filters
   const [filters, setFilters] = useState({
-    area_id: '',
     status: '',
     priority: ''
   });
 
   const location = useLocation();
-  const fetchData = async () => {
-    setLoading(true);
+
+  // silent=true → data updates in background without hiding the board
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     try {
-      const [ticketsResponse, areasResponse] = await Promise.all([
+      const [ticketsResponse, areasResponse, usersResponse] = await Promise.all([
         getTickets(filters),
-        getAreas()
+        getAreas(),
+        getUsers()
       ]);
       setTickets(ticketsResponse.data);
       setAreas(areasResponse.data);
+      setUsers(usersResponse.data);
     } catch (error) {
       console.error('Error fetching data', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [filters]);
+
+  // Ref so interval/event handlers always call the latest fetchData
+  const fetchDataRef = useRef(fetchData);
+  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
 
   useEffect(() => {
-    fetchData();
-    
-    // Check for deep link from notification state
+    // Initial full load
+    fetchData(false);
+
+    // Deep-link from notification
     if (location.state?.selectedTicketId) {
       setSelectedTicketId(location.state.selectedTicketId);
     }
-  }, [filters, location.state]);
+
+    // Silent refresh on ticket-change events (no board flicker)
+    const handleExternalChange = () => fetchDataRef.current(true);
+    window.addEventListener('crm:tickets-changed', handleExternalChange);
+
+    // Poll every 10s silently — board stays visible
+    const intervalId = setInterval(() => fetchDataRef.current(true), 10000);
+
+    return () => {
+      window.removeEventListener('crm:tickets-changed', handleExternalChange);
+      clearInterval(intervalId);
+    };
+  }, [fetchData, location.state]);
 
   const handleOpenDetail = (id: number) => {
     setSelectedTicketId(id);
@@ -78,6 +103,13 @@ export default function TicketListPage() {
         <p className="text-on-surface-variant font-body text-base md:text-lg leading-relaxed opacity-80">
           Gestión inteligente de incidencias, requerimientos y atención de tickets internos ICEP.
         </p>
+        {/* Live-sync indicator */}
+        {refreshing && (
+          <div className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 bg-primary/5 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Sincronizando...</span>
+          </div>
+        )}
       </div>
 
       {/* Stats Bento Grid - Dashboard Style */}
@@ -141,6 +173,7 @@ export default function TicketListPage() {
             <option value="in_progress">En Progreso</option>
             <option value="paused">Pausado</option>
             <option value="closed">Cerrado</option>
+            <option value="cancelled">Cancelado</option>
           </select>
           
           <select 
@@ -173,6 +206,7 @@ export default function TicketListPage() {
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
           </div>
         ) : (
+
           <div className="flex gap-6 min-w-max h-full">
             {['open', 'in_progress', 'paused', 'closed'].map(statusKey => {
               const columnTickets = tickets.filter(t => t.status === statusKey);
@@ -215,16 +249,30 @@ export default function TicketListPage() {
                             {ticket.title}
                           </h4>
                           <div className="flex items-center justify-between mt-4">
-                            <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded truncate max-w-[120px]">
-                              {ticket.area?.name}
-                            </span>
+                            <div className="flex -space-x-2">
+                               <div className="h-6 w-6 rounded-full bg-blue-50 border-2 border-white text-blue-700 flex items-center justify-center text-[8px] font-black shadow-sm" title={`Solicitante: ${ticket.requester?.name}`}>
+                                 {ticket.requester?.name.charAt(0)}
+                               </div>
+                            </div>
                             
                             {ticket.assignee ? (
-                              <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold" title={ticket.assignee.name}>
-                                {ticket.assignee.name.charAt(0)}
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-black uppercase text-gray-400">Asignado:</span>
+                                {ticket.assignee.avatar ? (
+                                  <img 
+                                    src={ticket.assignee.avatar.startsWith('http') ? ticket.assignee.avatar : `/api/v1${ticket.assignee.avatar}`} 
+                                    className="h-6 w-6 rounded-full object-cover border-2 border-white shadow-sm" 
+                                    title={ticket.assignee.name}
+                                    alt=""
+                                  />
+                                ) : (
+                                  <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm" title={ticket.assignee.name}>
+                                    {ticket.assignee.name.charAt(0)}
+                                  </div>
+                                )}
                               </div>
                             ) : (
-                              <div className="h-6 w-6 rounded-full border border-dashed border-gray-300 flex items-center justify-center text-gray-400" title="Sin asignar">
+                              <div className="h-6 w-6 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300" title="Sin asignar">
                                 ?
                               </div>
                             )}
@@ -248,18 +296,20 @@ export default function TicketListPage() {
       {isFormOpen && (
         <TicketFormModal 
           areas={areas}
+          users={users}
           onClose={() => setIsFormOpen(false)} 
-          onSuccess={() => { setIsFormOpen(false); fetchData(); }} 
+          onSuccess={() => { setIsFormOpen(false); fetchData(true); }} 
         />
       )}
       
       {selectedTicketId && (
         <TicketDetailModal 
-          ticketId={selectedTicketId}
+          ticketId={selectedTicketId as number}
           onClose={() => setSelectedTicketId(null)}
-          onUpdate={fetchData}
+          onUpdate={() => fetchData(true)}
         />
       )}
+
     </div>
   );
 }

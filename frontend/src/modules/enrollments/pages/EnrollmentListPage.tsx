@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getEnrollments, getCourses, updateEnrollmentStatus, EnrollmentForm as Enrollment } from '../services/enrollmentService';
 import {
@@ -40,20 +41,27 @@ const PAGE_SIZE = 10;
 
 // Status label map matching the API
 const STATUS_LABELS: Record<string, string> = {
-  pending_send: 'Por Enviar',
-  sent: 'Enviado',
-  completed: 'Completado',
-  in_review: 'En Revisión',
-  approved: 'Aprobado',
-  incomplete: 'Incompleto',
-  void: 'Anulado',
+  pending_send:      'Por Enviar Link',
+  sent:              'Esperando al Cliente',
+  completed:         'Formulario Llenado',
+  payment_pending:   'Verificando Pago ⏳',
+  payment_confirmed: 'Pago Confirmado ✓',
+  in_review:         'Matrícula Solicitada ⏳',
+  approved:          'Matriculado ✓',
+  incomplete:        'Datos Incompletos',
+  void:              'Anulado',
 };
 
 const getStatusStyle = (status: string) => {
   switch (status) {
     case 'approved':
+      return { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500', label: STATUS_LABELS[status] };
     case 'completed':
-      return { bg: 'bg-tertiary-fixed/20', text: 'text-on-tertiary-container', dot: 'bg-on-tertiary-container', label: STATUS_LABELS[status] };
+      return { bg: 'bg-orange-100', text: 'text-orange-800', dot: 'bg-orange-500', label: STATUS_LABELS[status] };
+    case 'payment_pending':
+      return { bg: 'bg-purple-100', text: 'text-purple-800', dot: 'bg-purple-500', label: STATUS_LABELS[status] };
+    case 'payment_confirmed':
+      return { bg: 'bg-teal-100', text: 'text-teal-800', dot: 'bg-teal-500', label: STATUS_LABELS[status] };
     case 'sent':
     case 'in_review':
       return { bg: 'bg-secondary-container', text: 'text-on-secondary-container', dot: 'bg-secondary', label: STATUS_LABELS[status] };
@@ -68,6 +76,7 @@ const getStatusStyle = (status: string) => {
 
 // Per-row action menu
 function RowMenu({ enrollment, onStatusChange, onReview }: { enrollment: Enrollment; onStatusChange: () => void; onReview: () => void }) {
+  const { hasRole } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -78,6 +87,8 @@ function RowMenu({ enrollment, onStatusChange, onReview }: { enrollment: Enrollm
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const copyLink = () => {
     const link = `${window.location.origin}/enrollment/${enrollment.uuid}`;
@@ -92,14 +103,18 @@ function RowMenu({ enrollment, onStatusChange, onReview }: { enrollment: Enrollm
   };
 
   const changeStatus = async (newStatus: string) => {
+    if (isUpdating) return;
+    setIsUpdating(true);
     try {
       await updateEnrollmentStatus(enrollment.id, newStatus);
       showSuccess('Estado Actualizado', `El expediente fue marcado como "${STATUS_LABELS[newStatus]}".`);
       onStatusChange();
     } catch {
       showError('Error', 'No se pudo actualizar el estado.');
+    } finally {
+      setIsUpdating(false);
+      setOpen(false);
     }
-    setOpen(false);
   };
 
   const voidEnrollment = async () => {
@@ -134,6 +149,28 @@ function RowMenu({ enrollment, onStatusChange, onReview }: { enrollment: Enrollm
 
             <div className="h-px bg-outline-variant/10 my-1" />
 
+            {enrollment.status === 'completed' && (
+              <button 
+                onClick={() => changeStatus('in_review')} 
+                disabled={isUpdating}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black text-amber-600 bg-amber-50 hover:bg-amber-100 transition-all text-left border border-amber-100 mt-1 disabled:opacity-50"
+              >
+                <Zap size={16} /> SOLICITAR MATRÍCULA
+              </button>
+            )}
+
+            {enrollment.status === 'in_review' && hasRole('admin') && (
+              <button 
+                onClick={() => changeStatus('approved')} 
+                disabled={isUpdating}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-all text-left border border-emerald-100 mt-1 disabled:opacity-50"
+              >
+                <ShieldCheck size={16} /> APROBAR MATRÍCULA (ADMIN)
+              </button>
+            )}
+
+            <div className="h-px bg-outline-variant/10 my-1" />
+
             <button onClick={copyLink} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-on-surface-variant hover:bg-surface-container-low transition-all text-left">
               <Copy size={16} className="text-on-primary-container" /> Copiar Enlace
             </button>
@@ -143,16 +180,22 @@ function RowMenu({ enrollment, onStatusChange, onReview }: { enrollment: Enrollm
 
             <div className="h-px bg-outline-variant/10 my-1" />
 
-            {enrollment.status !== 'approved' && (
-              <button onClick={() => changeStatus('approved')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-on-tertiary-container hover:bg-tertiary-fixed/10 transition-all text-left">
-                <CheckCircle2 size={16} /> Marcar como Aprobado
-              </button>
+            {/* Acciones de estado genéricas (solo visibles si no están en flujo principal o para correcciones) */}
+            {hasRole('admin') && (
+              <>
+                {enrollment.status !== 'approved' && enrollment.status !== 'in_review' && (
+                  <button onClick={() => changeStatus('approved')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-on-tertiary-container hover:bg-tertiary-fixed/10 transition-all text-left">
+                    <CheckCircle2 size={16} /> Marcar como Aprobado
+                  </button>
+                )}
+                {enrollment.status !== 'in_review' && enrollment.status !== 'completed' && (
+                  <button onClick={() => changeStatus('in_review')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-on-secondary-container hover:bg-secondary-container/40 transition-all text-left">
+                    <Eye size={16} /> Poner en Revisión
+                  </button>
+                )}
+              </>
             )}
-            {enrollment.status !== 'in_review' && (
-              <button onClick={() => changeStatus('in_review')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-on-secondary-container hover:bg-secondary-container/40 transition-all text-left">
-                <Eye size={16} /> Poner en Revisión
-              </button>
-            )}
+            
             {enrollment.status !== 'void' && (
               <button onClick={voidEnrollment} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-error hover:bg-error/5 transition-all text-left">
                 <XCircle size={16} /> Anular Expediente
@@ -168,6 +211,9 @@ function RowMenu({ enrollment, onStatusChange, onReview }: { enrollment: Enrollm
 export default function EnrollmentListPage() {
   const { hasPermission, hasRole } = useAuth();
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -175,6 +221,15 @@ export default function EnrollmentListPage() {
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<number | null>(null);
   const [validationEnabled, setValidationEnabled] = useState(false);
   const [isUpdatingValidation, setIsUpdatingValidation] = useState(false);
+
+  // Deep linking from notifications
+  useEffect(() => {
+    if (location.state?.selectedEnrollmentId) {
+      setSelectedEnrollmentId(location.state.selectedEnrollmentId);
+      // Clean up the state so it doesn't re-open if the user reloads or navigates back
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     const fetchSetting = async () => {
@@ -201,7 +256,10 @@ export default function EnrollmentListPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['enrollments', searchTerm, statusFilter, page],
     queryFn: () => getEnrollments({ search: searchTerm, status: statusFilter, page, per_page: PAGE_SIZE }),
+    refetchInterval: 10000,           // Poll every 10s — keeps the list live
+    refetchIntervalInBackground: true, // Keep polling even when tab is not focused
   });
+
 
   const { data: coursesData } = useQuery({
     queryKey: ['courses-for-enrollment'],
@@ -215,7 +273,17 @@ export default function EnrollmentListPage() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['enrollments'] });
+    queryClient.invalidateQueries({ queryKey: ['enrollment'] });
   };
+
+  // Auto-refresh when a notification signals an enrollment change
+  useEffect(() => {
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['enrollments'] });
+    };
+    window.addEventListener('crm:enrollments-changed', handler);
+    return () => window.removeEventListener('crm:enrollments-changed', handler);
+  }, [queryClient]);
 
   const exportCSV = () => {
     if (!enrollments.length) {
@@ -464,6 +532,17 @@ export default function EnrollmentListPage() {
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex justify-end items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const link = `${window.location.origin}/enrollment/${en.uuid}`;
+                            navigator.clipboard.writeText(link);
+                            showSuccess('Enlace Copiado', 'Link de matrícula copiado.');
+                          }}
+                          className="p-3 bg-surface-container-low text-orange-500 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all"
+                          title="Copiar Link de Matrícula"
+                        >
+                          <Link size={18} />
+                        </button>
                         <button
                           onClick={() => setSelectedEnrollmentId(en.id)}
                           className="p-3 bg-surface-container-low text-on-surface-variant/60 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"

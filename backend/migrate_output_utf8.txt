@@ -1,0 +1,7 @@
+﻿
+   INFO  Running migrations.  
+
+  2026_04_07_193643_alter_status_in_tickets_table  44.06ms DONE
+  2026_04_07_193643_create_ticket_replies_table  13.00ms DONE
+  2026_04_07_193643_create_ticket_resources_table  6.55ms DONE
+

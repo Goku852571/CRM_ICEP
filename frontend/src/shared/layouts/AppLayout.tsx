@@ -1,22 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Navigate, NavLink } from 'react-router-dom';
 import { useAuth } from '@/shared/hooks/useAuth';
-import { 
-  Users, 
-  LayoutDashboard, 
-  Ticket, 
-  FileText, 
-  LogOut, 
-  Calendar, 
-  BookOpen, 
+import {
+  Users,
+  LayoutDashboard,
+  Ticket,
+  FileText,
+  LogOut,
+  Calendar,
+  BookOpen,
   Menu,
-  GraduationCap,
   TrendingUp,
   Mail,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
+import logo from '@/assets/logo.png';
 
 export default function AppLayout() {
   const { isAuthenticated, user, logout, hasPermission, hasRole, isLoading } = useAuth();
@@ -29,7 +29,7 @@ export default function AppLayout() {
     localStorage.setItem('sidebar-collapsed', String(isCollapsed));
   }, [isCollapsed]);
 
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface text-primary">
@@ -43,10 +43,9 @@ export default function AppLayout() {
   }
 
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3 py-3 rounded-xl font-body text-sm font-medium transition-all duration-300 ease-in-out ${
-      isActive 
-        ? 'bg-surface-container-lowest text-primary shadow-sm ghost-border' 
-        : 'text-on-surface-variant hover:text-primary hover:bg-white/50'
+    `flex items-center gap-3 px-3 py-3 rounded-xl font-body text-sm font-medium transition-all duration-300 ease-in-out ${isActive
+      ? 'bg-surface-container-lowest text-primary shadow-sm ghost-border'
+      : 'text-on-surface-variant hover:text-primary hover:bg-white/50'
     } ${isCollapsed ? 'justify-center px-0' : ''}`;
 
 
@@ -56,7 +55,7 @@ export default function AppLayout() {
       <aside className={`fixed left-0 top-0 h-full hidden lg:flex flex-col ${isCollapsed ? 'w-20' : 'w-72'} bg-surface-container-low border-r border-outline-variant/10 z-50 transition-all duration-500 ease-in-out group/sidebar`}>
         <div className="flex flex-col h-full p-4 overflow-hidden">
           {/* Collapse Toggle Button */}
-          <button 
+          <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="absolute -right-3 top-20 bg-surface-container-high border border-outline-variant/20 rounded-full p-1.5 text-primary shadow-md hover:bg-primary hover:text-white transition-all duration-300 z-50 opacity-0 group-hover/sidebar:opacity-100 hover:scale-110 active:scale-95"
           >
@@ -64,10 +63,9 @@ export default function AppLayout() {
           </button>
 
           {/* Brand/Logo Area */}
-          <div className={`px-4 py-6 mb-4 flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3'} transition-all duration-500`}>
-            <div className="w-10 h-10 min-w-[40px] rounded-full primary-gradient flex items-center justify-center text-tertiary-fixed shadow-lg shadow-primary/20 shrink-0">
-              <GraduationCap size={22} />
-            </div>
+          <div className={`px-4 py-6 mb-4 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} transition-all duration-500`}>
+            <img src={logo} alt="ICEP Logo" className="w-12 h-12 object-contain shrink-0 transition-all duration-500" />
+
             {!isCollapsed && (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500 overflow-hidden whitespace-nowrap">
                 <h1 className="font-headline font-extrabold text-primary text-lg leading-tight uppercase tracking-tight">ICEP CRM</h1>
@@ -75,11 +73,11 @@ export default function AppLayout() {
               </div>
             )}
           </div>
-          
+
           {/* User Profile Section (Enhanced) */}
           <div className={`px-4 mb-6 transition-all duration-500 ${isCollapsed ? 'px-0 flex justify-center' : ''}`}>
-            <NavLink 
-              to="/profile" 
+            <NavLink
+              to="/profile"
               className={`flex transition-all group ${isCollapsed ? 'flex-row justify-center p-1' : 'flex-col items-center p-4 bg-surface-container-lowest/50 rounded-3xl ghost-border shadow-sm text-center gap-3'}`}
               title={isCollapsed ? user?.name : "Mi Perfil"}
             >
@@ -169,7 +167,7 @@ export default function AppLayout() {
           </nav>
 
           <div className="mt-auto pt-4 border-t border-outline-variant/10">
-            <button 
+            <button
               onClick={logout}
               className={`w-full flex items-center gap-3 p-3 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-xl transition-all active:scale-95 ${isCollapsed ? 'justify-center' : ''}`}
               title="Cerrar Sesión"
@@ -181,7 +179,7 @@ export default function AppLayout() {
 
         </div>
       </aside>
-      
+
       {/* Main Content Area */}
       <main className={`flex-1 flex flex-col min-h-screen ${isCollapsed ? 'lg:pl-20' : 'lg:pl-72'} relative transition-all duration-500 ease-in-out`}>
         {/* Top AppBar */}
@@ -200,23 +198,23 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-4">
-             <NotificationBell />
-             
-             <NavLink 
-               to="/profile" 
-               className={({ isActive }) => 
-                 `h-10 w-10 rounded-full primary-gradient flex items-center justify-center text-white text-xs font-bold shadow-md hover:shadow-lg transition-all border-2 border-white overflow-hidden ${isActive ? 'ring-2 ring-primary offset-2' : ''}`
-               }
-               title="Mi Perfil"
-             >
-               {user?.avatar ? (
-                 <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-               ) : (
-                 user?.name?.charAt(0) || 'U'
-               )}
-             </NavLink>
+            <NotificationBell />
 
-             <div className="h-6 w-px bg-outline-variant/20 mx-1"></div>
+            <NavLink
+              to="/profile"
+              className={({ isActive }) =>
+                `h-10 w-10 rounded-full primary-gradient flex items-center justify-center text-white text-xs font-bold shadow-md hover:shadow-lg transition-all border-2 border-white overflow-hidden ${isActive ? 'ring-2 ring-primary offset-2' : ''}`
+              }
+              title="Mi Perfil"
+            >
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                user?.name?.charAt(0) || 'U'
+              )}
+            </NavLink>
+
+            <div className="h-6 w-px bg-outline-variant/20 mx-1"></div>
           </div>
         </header>
 

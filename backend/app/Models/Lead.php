@@ -31,6 +31,9 @@ class Lead extends Model
     {
         static::creating(function ($lead) {
             $lead->uuid = (string) \Illuminate\Support\Str::uuid();
+            if (empty($lead->student_id)) {
+                $lead->student_id = self::generateIcepId();
+            }
         });
     }
 
@@ -72,5 +75,10 @@ class Lead extends Model
     public function opportunities()
     {
         return $this->hasMany(LeadOpportunity::class)->orderBy('created_at', 'desc');
+    }
+
+    public function enrollment()
+    {
+        return $this->hasOne(EnrollmentForm::class);
     }
 }

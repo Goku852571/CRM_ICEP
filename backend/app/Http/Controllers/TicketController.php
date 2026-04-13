@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Ticket;
 use App\Models\TicketHistory;
+use App\Models\TicketReply;
+use App\Models\TicketResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Models\User;
@@ -49,6 +51,7 @@ class TicketController extends ApiController
             'area_id' => 'required|exists:areas,id',
             'assignee_id' => 'nullable|exists:users,id',
             'priority' => 'in:normal,urgent,priority',
+            'resources.*' => 'nullable|file|max:10240',
         ]);
 
         $maxPosition = Ticket::where('area_id', $request->area_id)
@@ -65,6 +68,19 @@ class TicketController extends ApiController
             'status' => 'open',
             'position' => $maxPosition ? $maxPosition + 1 : 1,
         ]);
+
+        if ($request->hasFile('resources')) {
+            foreach ($request->file('resources') as $file) {
+                $path = $file->store('tickets', 'public');
+                TicketResource::create([
+                    'ticket_id' => $ticket->id,
+                    'file_path' => $path,
+                    'file_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
+            }
+        }
 
         TicketHistory::create([
             'ticket_id' => $ticket->id,
@@ -91,7 +107,51 @@ class TicketController extends ApiController
                 return response()->json(['message' => 'No autorizado'], 403);
             }
         }
-        return $this->success($ticket->load(['area', 'requester', 'assignee', 'histories.user']));
+        return $this->success($ticket->load([
+            'area', 
+            'requester', 
+            'assignee', 
+            'histories.user', 
+            'replies.user', 
+            'replies.resources', 
+            'resources'
+        ]));
+    }
+
+    public function storeReply(Request $request, Ticket $ticket): JsonResponse
+    {
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_departamento')) {
+            if ($ticket->requester_id !== $request->user()->id && $ticket->assignee_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
+
+        $request->validate([
+            'message' => 'required|string',
+            'resources.*' => 'nullable|file|max:10240', // 10MB max per file
+        ]);
+
+        $reply = TicketReply::create([
+            'ticket_id' => $ticket->id,
+            'user_id' => $request->user()->id,
+            'message' => $request->message,
+        ]);
+
+        if ($request->hasFile('resources')) {
+            foreach ($request->file('resources') as $file) {
+                $path = $file->store('tickets', 'public');
+                TicketResource::create([
+                    'ticket_id' => $ticket->id,
+                    'ticket_reply_id' => $reply->id,
+                    'file_path' => $path,
+                    'file_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
+            }
+        }
+
+        return $this->success($reply->load(['user', 'resources']), 'Respuesta enviada', 201);
     }
 
     public function update(Request $request, Ticket $ticket): JsonResponse
@@ -123,7 +183,7 @@ class TicketController extends ApiController
         }
 
         $request->validate([
-            'status' => 'required|in:open,in_progress,paused,closed,cancelled',
+            'status' => 'required|in:open,in_progress,paused,closed,cancelled,waiting_approval,changes_requested',
             'reason' => 'required|string',
         ]);
 
