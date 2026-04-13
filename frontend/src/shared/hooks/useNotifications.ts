@@ -22,9 +22,11 @@ const playNotificationSound = () => {
   try {
     const audio = new Audio('/sounds/notificacion.mp3');
     audio.volume = 0.8;
-    audio.play().catch(e => console.warn('Audio play failed (user interaction required):', e));
+    audio.play().catch(() => {
+      // Ignorar NotAllowedError porque es esperado si el usuario aún no interactuó con la página
+    });
   } catch (e) {
-    console.error('Audio play failed', e);
+    console.error('Audio play error', e);
   }
 };
 

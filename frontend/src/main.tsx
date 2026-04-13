@@ -33,7 +33,20 @@ const queryClient = new QueryClient({
   },
 });
 
+// Patch para silenciar el warning de react-beautiful-dnd sobre contenedores con scroll anidados
+// (El board horizontal con columnas verticales es completamente funcional pero genera este warning)
+const originalLog = console.log;
+const originalWarn = console.warn;
 
+console.log = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('unsupported nested scroll container detected')) return;
+  originalLog(...args);
+};
+
+console.warn = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('unsupported nested scroll container detected')) return;
+  originalWarn(...args);
+};
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

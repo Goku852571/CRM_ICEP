@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable, DropResult, DragUpdate } from '@hello-pangea/dnd';
 import { 
   Plus, Search, Filter, Phone, Mail, Clock, 
-  MapPin, CheckCircle2, ChevronRight, XCircle, Tag, Building2, User
+  MapPin, CheckCircle2, ChevronRight, XCircle, Tag, Building2, User,
+  DownloadCloud
 } from 'lucide-react';
 import { getLeads, updateLeadStatus, Lead } from '../services/leadService';
 import LeadDetailModal from '../components/LeadDetailModal';
@@ -11,7 +12,6 @@ import ImportLeadsModal from '../components/ImportLeadsModal';
 import LeadFormModal from '../components/LeadFormModal';
 import { showSuccess, showError } from '@/shared/utils/alerts';
 import { useAuth } from '@/shared/hooks/useAuth';
-import { DownloadCloud } from 'lucide-react';
 import clsx from 'clsx';
 
 const COLUMNS = [
@@ -35,6 +35,26 @@ export default function LeadBoardPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
 
+  // Accordion State
+  const [expandedColumns, setExpandedColumns] = useState<string[]>(['new', 'contacted', 'interested']);
+  const [hoverExpandedColumn, setHoverExpandedColumn] = useState<string | null>(null);
+
+  const toggleColumn = (id: string) => {
+    setExpandedColumns(prev => {
+      if (prev.includes(id)) {
+        // Prevent collapsing if it's the very last one open to avoid empty screen
+        if (prev.length === 1) return prev; 
+        return prev.filter(col => col !== id);
+      }
+      const newExpanded = [...prev, id];
+      // Max 3 columns open at the same time
+      if (newExpanded.length > 3) {
+        return newExpanded.slice(newExpanded.length - 3);
+      }
+      return newExpanded;
+    });
+  };
+
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ['leads', { kanban: true }],
     queryFn: () => getLeads({ kanban: true }).then(res => res.data as Lead[]),
@@ -49,7 +69,21 @@ export default function LeadBoardPage() {
     onError: () => showError('Error al actualizar', 'No se pudo mover el lead. Intente recargar.í'),
   });
 
+  const onDragStart = () => {
+    setHoverExpandedColumn(null);
+  };
+
+  const onDragUpdate = (update: DragUpdate) => {
+    if (update.destination) {
+      setHoverExpandedColumn(update.destination.droppableId);
+    } else {
+      setHoverExpandedColumn(null);
+    }
+  };
+
   const onDragEnd = (result: DropResult) => {
+    setHoverExpandedColumn(null);
+
     const { source, destination, draggableId } = result;
 
     if (!destination) return;
@@ -102,75 +136,102 @@ export default function LeadBoardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto custom-scrollbar no-scrollbar">
-          <div className="relative flex-none w-48 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline" size={14} />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border-none bg-surface-container-high rounded-xl text-xs focus:ring-2 focus:ring-primary-fixed hover:bg-surface-variant transition-all font-medium text-on-surface"
-            />
+        <div className="flex flex-col sm:items-end gap-3 w-full sm:w-auto">
+          {/* Top row: Search and Actions */}
+          <div className="flex flex-wrap items-center gap-3 w-full justify-end">
+            <div className="relative flex-1 sm:flex-none sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline" size={14} />
+              <input
+                type="text"
+                placeholder="Buscar por nombre, teléfono, email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border-none bg-surface-container-high rounded-xl text-xs focus:ring-2 focus:ring-primary-fixed hover:bg-surface-variant transition-all font-medium text-on-surface shadow-sm"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              {(hasRole('admin') || hasRole('jefe')) && (
+                <button 
+                  onClick={() => setShowImportModal(true)}
+                  className="flex items-center gap-2 bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-sm hover:shadow-md transition-all whitespace-nowrap"
+                >
+                  <DownloadCloud size={18} />
+                  <span className="hidden lg:inline">Importar</span>
+                </button>
+              )}
+
+              <button 
+                onClick={() => setShowLeadForm(true)}
+                className="flex items-center gap-2 bg-primary-container text-on-primary-container disabled:opacity-50 px-4 py-2.5 rounded-xl font-bold text-sm hover:shadow-md transition-all active:scale-95 whitespace-nowrap"
+              >
+                <Plus size={18} />
+                <span className="hidden lg:inline">Nuevo Lead</span>
+              </button>
+            </div>
           </div>
 
-          <select 
-             className="flex-none py-2 px-3 border-none bg-surface-container-high rounded-xl text-[10px] sm:text-xs font-bold text-on-surface focus:ring-2 focus:ring-primary-fixed hover:bg-surface-variant transition-all outline-none"
-             value={sourceFilter}
-             onChange={e => setSourceFilter(e.target.value)}
-          >
-             <option value="">Origen</option>
-             {uniqueSources.map(s => (
-               <option key={s as string} value={s as string}>
-                 {s === 'import' ? 'Importación' : s === 'enrollment_form' ? 'Autoregistro' : s}
-               </option>
-             ))}
-          </select>
-
-          <select 
-             className="flex-none py-2 px-3 border-none bg-surface-container-high rounded-xl text-[10px] sm:text-xs font-bold text-on-surface focus:ring-2 focus:ring-primary-fixed max-w-[120px] sm:max-w-[200px] truncate hover:bg-surface-variant transition-all outline-none"
-             value={courseFilter}
-             onChange={e => setCourseFilter(e.target.value)}
-          >
-             <option value="">Curso</option>
-             {uniqueCourses.map(c => <option key={c as string} value={c as string}>{c as string}</option>)}
-          </select>
-
-          {(hasRole('admin') || hasRole('jefe')) && (
+          {/* Bottom row: Filters */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 w-full justify-end custom-scrollbar no-scrollbar">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-outline uppercase tracking-wider mr-2">
+              <Filter size={12} />
+              Filtrar por:
+            </div>
+            
             <select 
-               className="flex-none py-2 px-3 border-none bg-surface-container-high rounded-xl text-[10px] sm:text-xs font-bold text-on-surface focus:ring-2 focus:ring-primary-fixed max-w-[120px] sm:max-w-[200px] truncate hover:bg-surface-variant transition-all outline-none"
-               value={advisorFilter}
-               onChange={e => setAdvisorFilter(e.target.value)}
+               className="flex-none py-1.5 px-3 border border-outline-variant/30 bg-white rounded-lg text-[10px] sm:text-xs font-bold text-on-surface focus:ring-2 focus:ring-primary-fixed hover:bg-surface-variant transition-all outline-none shadow-sm cursor-pointer"
+               value={sourceFilter}
+               onChange={e => setSourceFilter(e.target.value)}
             >
-               <option value="">Asesor</option>
-               {uniqueAdvisors.map(adv => (
-                 <option key={adv?.id} value={adv?.id?.toString()}>{adv?.name}</option>
+               <option value="">Todos los Orígenes</option>
+               {uniqueSources.map(s => (
+                 <option key={s as string} value={s as string}>
+                   {s === 'import' ? 'Importación' : s === 'enrollment_form' ? 'Autoregistro' : s}
+                 </option>
                ))}
             </select>
-          )}
-          
-          {(hasRole('admin') || hasRole('jefe')) && (
-            <button 
-              onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-2 bg-secondary-container text-on-secondary-container px-4 py-2 rounded-xl font-bold text-sm hover:shadow-md transition-all"
-            >
-              <DownloadCloud size={18} />
-              <span className="hidden sm:inline">Importar Contactos</span>
-            </button>
-          )}
 
-          <button 
-            onClick={() => setShowLeadForm(true)}
-            className="flex items-center gap-2 bg-primary-container text-on-primary-container disabled:opacity-50 px-4 py-2 rounded-xl font-bold text-sm hover:shadow-md transition-all active:scale-95"
-          >
-            <Plus size={18} />
-            <span className="hidden sm:inline">Nuevo Lead</span>
-          </button>
+            <select 
+               className="flex-none py-1.5 px-3 border border-outline-variant/30 bg-white rounded-lg text-[10px] sm:text-xs font-bold text-on-surface focus:ring-2 focus:ring-primary-fixed max-w-[150px] truncate hover:bg-surface-variant transition-all outline-none shadow-sm cursor-pointer"
+               value={courseFilter}
+               onChange={e => setCourseFilter(e.target.value)}
+            >
+               <option value="">Todos los Cursos</option>
+               {uniqueCourses.map(c => <option key={c as string} value={c as string}>{c as string}</option>)}
+            </select>
+
+            {(hasRole('admin') || hasRole('jefe')) && (
+              <select 
+                 className="flex-none py-1.5 px-3 border border-outline-variant/30 bg-white rounded-lg text-[10px] sm:text-xs font-bold text-on-surface focus:ring-2 focus:ring-primary-fixed max-w-[150px] truncate hover:bg-surface-variant transition-all outline-none shadow-sm cursor-pointer"
+                 value={advisorFilter}
+                 onChange={e => setAdvisorFilter(e.target.value)}
+              >
+                 <option value="">Todos los Asesores</option>
+                 {uniqueAdvisors.map(adv => (
+                   <option key={adv?.id} value={adv?.id?.toString()}>{adv?.name}</option>
+                 ))}
+              </select>
+            )}
+
+            {(searchTerm || sourceFilter || courseFilter || advisorFilter) && (
+              <button 
+                onClick={() => {
+                  setSearchTerm('');
+                  setSourceFilter('');
+                  setCourseFilter('');
+                  setAdvisorFilter('');
+                }}
+                className="text-[10px] font-bold text-error hover:underline px-2 transition-all whitespace-nowrap"
+              >
+                Limpiar Filtros
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Kanban Board Container */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-surface/50 p-6 min-h-0 relative">
+      <div className="flex-1 bg-surface-container-lowest p-6 min-h-0 relative">
         {isLoading && (
           <div className="absolute inset-0 bg-surface/50 backdrop-blur-sm z-10 flex items-center justify-center">
             <div className="flex gap-2">
@@ -181,105 +242,147 @@ export default function LeadBoardPage() {
           </div>
         )}
 
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex h-full gap-5 pb-4 w-max">
+        <DragDropContext onDragEnd={onDragEnd} onDragUpdate={onDragUpdate} onDragStart={onDragStart}>
+          <div className="flex h-full gap-3 pb-4 w-full">
             {COLUMNS.map((column) => {
               const columnLeads = filteredLeads.filter(l => l.status === column.id);
+              const isExpanded = expandedColumns.includes(column.id) || hoverExpandedColumn === column.id;
 
               return (
-                <div key={column.id} className="flex flex-col w-[320px] max-h-full rounded-2xl bg-surface-container-lowest border border-outline-variant/20 shadow-sm overflow-hidden flex-shrink-0">
+                <div 
+                  key={column.id} 
+                  className={clsx(
+                    "relative flex flex-col max-h-full rounded-2xl bg-surface-container-lowest border shadow-sm overflow-hidden flex-shrink-0 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] group",
+                    isExpanded 
+                      ? 'flex-1 min-w-[280px] max-w-[380px] border-outline-variant/20' 
+                      : 'w-14 cursor-pointer hover:bg-surface-container-low hover:border-primary/40 border-outline-variant/30'
+                  )}
+                >
                   
-                  {/* Column Header */}
-                  <div className={clsx("p-4 border-b border-outline-variant/10 flex items-center justify-between pointer-events-none select-none", column.color)}>
-                    <div className="flex items-center gap-2">
-                       <span className={clsx("w-2 h-2 rounded-full", column.dot)}></span>
-                       <h3 className={clsx("font-headline font-bold text-sm uppercase tracking-wide", column.headerColor)}>
-                         {column.title}
-                       </h3>
-                    </div>
-                    <span className="bg-white/60 px-2 py-0.5 rounded text-xs font-bold text-on-surface-variant">
-                      {columnLeads.length}
-                    </span>
-                  </div>
-
-                  {/* Column Body / Droppable Area */}
-                  <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
-                    <Droppable droppableId={column.id}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={clsx(
-                            "min-h-[150px] transition-colors rounded-xl",
-                            snapshot.isDraggingOver ? 'bg-surface-variant/30 ring-2 ring-primary-fixed/50 ring-inset' : ''
-                          )}
-                        >
-                          {columnLeads.map((lead, index) => (
-                            <Draggable key={`lead-${lead.id}`} draggableId={`lead-${lead.id}`} index={index}>
-                              {(provided, snapshot) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  onClick={() => setSelectedLeadId(lead.id)}
-                                  className={clsx(
-                                    "bg-white p-4 rounded-xl border border-outline-variant/20 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing mb-3 group",
-                                    snapshot.isDragging ? 'shadow-xl ring-2 ring-primary-fixed/50 rotate-2' : ''
-                                  )}
-                                  style={provided.draggableProps.style}
-                                >
-                                  {/* Source Badge */}
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
-                                      {lead.source === 'enrollment_form' ? (
-                                        <span className="text-blue-600 bg-blue-50 px-1.5 rounded inline-flex items-center gap-1">🌐 Autoregistro</span>
-                                      ) : (
-                                        <span className="text-gray-500 bg-gray-50 px-1.5 rounded inline-flex items-center gap-1">👤 Manual</span>
-                                      )}
-                                    </span>
-                                    <span className="text-[10px] bg-surface-container-high text-on-surface-variant px-1.5 rounded font-mono font-bold">
-                                      {lead.student_id ? lead.student_id.slice(-6) : 'N/A'}
-                                    </span>
-                                  </div>
-
-                                  <h4 className="font-bold text-on-surface leading-tight mb-1 group-hover:text-primary-compressed transition-colors">
-                                    {lead.name}
-                                  </h4>
-
-                                  <div className="text-xs text-on-surface-variant space-y-1 mb-3">
-                                    <div className="flex items-center gap-1.5">
-                                      <Phone size={12} className="text-outline" /> {lead.phone}
-                                    </div>
-                                    {lead.course?.name && (
-                                      <div className="flex items-center gap-1.5 line-clamp-1">
-                                        <Tag size={12} className="text-outline shrink-0" /> <span className="truncate">{lead.course.name}</span>
-                                      </div>
-                                    )}
-                                    {(hasRole('admin') || hasRole('jefe')) && lead.advisor?.name && (
-                                      <div className="flex items-center gap-1.5 mt-2 pt-1 border-t border-dashed border-outline-variant/10 text-primary font-bold">
-                                        <User size={12} className="shrink-0" /> <span className="truncate whitespace-nowrap text-[10px] uppercase tracking-tighter">Asesor: {lead.advisor.name}</span>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="pt-3 border-t border-outline-variant/10 flex items-center justify-between text-[11px] font-medium text-on-surface-variant/70">
-                                     <div className="flex items-center gap-1">
-                                        <Clock size={12} />
-                                        {/* Simple relative time (mock logic or actual) */}
-                                        {new Date(lead.created_at).toLocaleDateString()}
-                                     </div>
-                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                        Detalles &rarr;
-                                     </div>
-                                  </div>
-                                </div>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
+                  {/* Collapsed Overlay */}
+                  {!isExpanded && (
+                    <div 
+                       onClick={() => toggleColumn(column.id)}
+                       className="absolute inset-0 z-10 flex flex-col items-center py-5 space-y-6 bg-surface-container-lowest group-hover:bg-surface-container-low transition-colors"
+                    >
+                        <div className="flex items-center justify-center p-1.5 rounded-full ring-1 ring-outline-variant/30 bg-white group-hover:ring-primary/40 group-hover:shadow-sm transition-all">
+                            <span className={clsx("w-3 h-3 rounded-full", column.dot)}></span>
                         </div>
-                      )}
-                    </Droppable>
+                        <span className="bg-surface-container-high px-2 py-0.5 rounded text-[10px] font-bold text-on-surface-variant flex-shrink-0 border border-outline-variant/20 shadow-sm">
+                            {columnLeads.length}
+                        </span>
+                        <div className="flex-1 flex justify-center mt-4">
+                            <h3 className={clsx(
+                                "font-headline font-bold text-[13px] uppercase tracking-widest [writing-mode:vertical-rl] rotate-180 select-none whitespace-nowrap", 
+                                column.headerColor,
+                                "group-hover:text-primary transition-colors opacity-80 group-hover:opacity-100"
+                            )}>
+                                {column.title}
+                            </h3>
+                        </div>
+                    </div>
+                  )}
+
+                  {/* Expanded Content View (Remains mounted but clipped/hidden when collapsed by absolute overlay) */}
+                  <div className={clsx("flex flex-col h-full w-full min-w-[280px]", !isExpanded && "opacity-0 invisible")}>
+                    {/* Column Header */}
+                    <div 
+                        className={clsx("p-4 border-b border-outline-variant/10 flex items-center justify-between select-none cursor-pointer hover:bg-black/5 transition-colors", column.color)}
+                        onClick={() => toggleColumn(column.id)}
+                        title="Haz clic para colapsar"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={clsx("w-2 h-2 rounded-full", column.dot)}></span>
+                        <h3 className={clsx("font-headline font-bold text-sm uppercase tracking-wide", column.headerColor)}>
+                          {column.title}
+                        </h3>
+                      </div>
+                      <span className="bg-white/60 px-2 py-0.5 rounded text-xs font-bold text-on-surface-variant">
+                        {columnLeads.length}
+                      </span>
+                    </div>
+
+                    {/* Column Body / Droppable Area */}
+                    <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                      <Droppable droppableId={column.id}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={clsx(
+                              "min-h-[150px] transition-colors rounded-xl h-full pb-20",
+                              snapshot.isDraggingOver ? 'bg-surface-variant/30 ring-2 ring-primary-fixed/50 ring-inset' : ''
+                            )}
+                          >
+                            {columnLeads.map((lead, index) => (
+                              <Draggable key={`lead-${lead.id}`} draggableId={`lead-${lead.id}`} index={index}>
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    onClick={() => setSelectedLeadId(lead.id)}
+                                    className={clsx(
+                                      "bg-white p-4 rounded-xl border border-outline-variant/20 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing mb-3 group relative overflow-hidden",
+                                      snapshot.isDragging ? 'shadow-2xl ring-2 ring-primary-fixed rotate-3 scale-105 z-50' : ''
+                                    )}
+                                    style={provided.draggableProps.style}
+                                  >
+                                    {/* Subtle left border line matching the status color */}
+                                    <div className={clsx("absolute left-0 top-0 bottom-0 w-1", column.dot || "bg-outline-variant/20" )}></div>
+                                    
+                                    {/* Source Badge */}
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
+                                        {lead.source === 'enrollment_form' ? (
+                                          <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-flex items-center gap-1"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span> Autoregistro</span>
+                                        ) : (
+                                          <span className="text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded inline-flex items-center gap-1">👤 Manual</span>
+                                        )}
+                                      </span>
+                                      <span className="text-[10px] bg-surface-container-high text-on-surface-variant px-1.5 rounded font-mono font-bold tracking-tight">
+                                        {lead.student_id ? lead.student_id.slice(-6) : 'N/A'}
+                                      </span>
+                                    </div>
+
+                                    <h4 className="font-bold text-on-surface leading-tight mb-2 group-hover:text-primary transition-colors">
+                                      {lead.name}
+                                    </h4>
+
+                                    <div className="text-xs text-on-surface-variant space-y-1.5 mb-3">
+                                      <div className="flex items-center gap-1.5 text-on-surface">
+                                        <Phone size={12} className="text-outline" /> <span className="font-medium">{lead.phone}</span>
+                                      </div>
+                                      {lead.course?.name && (
+                                        <div className="flex items-center gap-1.5 line-clamp-1 bg-surface-container-lowest px-1.5 py-1 rounded-md border border-outline-variant/20">
+                                          <Tag size={12} className="text-outline shrink-0" /> <span className="truncate font-medium text-[11px]">{lead.course.name}</span>
+                                        </div>
+                                      )}
+                                      {(hasRole('admin') || hasRole('jefe')) && lead.advisor?.name && (
+                                        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-dashed border-outline-variant/20 text-primary-compressed font-bold/80">
+                                          <User size={12} className="shrink-0 text-primary/50" /> <span className="truncate whitespace-nowrap text-[10px] tracking-tight">Vendedor: {lead.advisor.name}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="pt-3 flex items-center justify-between text-[10px] font-bold text-outline uppercase tracking-wider">
+                                       <div className="flex items-center gap-1.5 opacity-60">
+                                          <Clock size={12} />
+                                          {new Date(lead.created_at).toLocaleDateString()}
+                                       </div>
+                                       <div className="opacity-0 group-hover:opacity-100 transition-opacity text-primary translate-x-1 group-hover:translate-x-0 transform duration-300">
+                                          Detalles &rarr;
+                                       </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    </div>
                   </div>
                 </div>
               );
