@@ -72,7 +72,7 @@ class LeadController extends Controller
 
         // Kanban needs all leads usually, or maybe paginated if many
         if ($request->has('kanban')) {
-            return response()->json(['data' => $query->get()]);
+            return response()->json(['data' => $query->latest()->get()]);
         }
 
         return $query->latest()->paginate($request->input('per_page', 15));
@@ -147,6 +147,11 @@ class LeadController extends Controller
             unset($validated['advisor_id']);
         }
 
+        // PROTECTION: Leads cannot return to 'new' once they've left it
+        if (isset($validated['status']) && $lead->status !== 'new' && $validated['status'] === 'new') {
+            return response()->json(['message' => 'No se puede regresar un contacto a la fase Nuevo.'], 422);
+        }
+
         $lead->update($validated);
         return response()->json(['message' => 'Lead updated successfully', 'data' => $lead]);
     }
@@ -162,6 +167,11 @@ class LeadController extends Controller
         $validated = $request->validate([
             'status' => 'required|string',
         ]);
+
+        // PROTECTION: Leads cannot return to 'new' once they've left it
+        if ($lead->status !== 'new' && $validated['status'] === 'new') {
+            return response()->json(['message' => 'No se puede regresar un contacto a la fase Nuevo una vez que ha sido procesado.'], 422);
+        }
 
         $lead->update(['status' => $validated['status']]);
 
@@ -190,6 +200,11 @@ class LeadController extends Controller
             'notes' => $validated['notes'],
             'interacted_at' => now(),
         ]);
+
+        // AUTOMATIC TRANSITION: If lead was 'new', move to 'contacted'
+        if ($lead->status === 'new') {
+            $lead->update(['status' => 'contacted']);
+        }
 
         return response()->json(['message' => 'Interaction added successfully', 'data' => $interaction->load('user')], 201);
     }

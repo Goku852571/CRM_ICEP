@@ -3,10 +3,11 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
   X, Phone, Mail, MapPin, Tag, Clock, MessageSquare, 
   PhoneCall, Send, Link2, Copy, CheckCircle, Loader2, User,
-  Calendar, Briefcase, ChevronRight, Activity, Info
+  Calendar, Briefcase, ChevronRight, Activity, Info, Edit
 } from 'lucide-react';
 import { getLead, addLeadInteraction, Lead } from '../services/leadService';
 import { createEnrollment } from '@/modules/enrollments/services/enrollmentService';
+import LeadFormModal from './LeadFormModal';
 import { useAuth } from '@/shared/hooks/useAuth';
 import clsx from 'clsx';
 import { showSuccess, showError } from '@/shared/utils/alerts';
@@ -60,6 +61,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     // Animation trigger
@@ -92,6 +94,15 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
   const enrollmentMutation = useMutation({
     mutationFn: () => {
       if (!lead) throw new Error('No lead data');
+      
+      // Validation before sending to prevent 422
+      if (!lead.course_interest_id) {
+        throw new Error('Debe asignar un curso de interés al lead antes de generar el link.');
+      }
+      if (!lead.advisor_id) {
+        throw new Error('El lead no tiene un asesor asignado.');
+      }
+
       return createEnrollment({ 
         lead_id: leadId,
         advisor_id: lead.advisor_id,
@@ -107,6 +118,11 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
       refetch();
       onUpdated();
     },
+    onError: (error: any) => {
+      console.error('Enrollment error:', error);
+      const message = error.response?.data?.message || error.message || 'No se pudo generar el link de matrícula.';
+      showError('Error de validación', message);
+    }
   });
 
   if (isLoading) {
@@ -154,7 +170,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
       
       {/* Modal Container */}
       <div className={clsx(
-        "relative w-full max-w-5xl bg-white rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden transition-all duration-300 transform max-h-[90vh]",
+        "relative w-full max-w-5xl bg-white rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden transition-all duration-300 transform h-[90vh] md:h-[85vh]",
         isVisible ? "scale-100 translate-y-0" : "scale-95 translate-y-4"
       )}>
         
@@ -167,7 +183,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
         </button>
 
         {/* LEFT COLUMN: Summary & Info */}
-        <div className="md:w-80 flex-shrink-0 bg-slate-50/80 border-r border-slate-100 p-8 flex flex-col h-full overflow-y-auto no-scrollbar">
+        <div className="md:w-80 flex-shrink-0 bg-slate-50/80 border-r border-slate-100 p-8 flex flex-col h-full overflow-y-auto custom-scrollbar">
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest font-mono">
@@ -256,7 +272,16 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
         {/* RIGHT COLUMN: Tabs & Main Content */}
         <div className="flex-1 flex flex-col h-full bg-white relative">
           {/* Header Action / Close */}
-          <div className="hidden md:flex absolute top-6 right-8 z-10">
+          <div className="hidden md:flex absolute top-6 right-8 z-10 items-center gap-2">
+            {!isReadOnly && !isWon && (
+              <button 
+                onClick={() => setShowEditModal(true)}
+                className="p-2.5 bg-white text-primary hover:bg-primary hover:text-white rounded-2xl transition-all shadow-sm active:scale-95 border border-primary/20 flex items-center gap-2 px-4 font-bold text-xs"
+              >
+                <Edit size={16} />
+                Editar Lead
+              </button>
+            )}
             <button 
               onClick={handleClose}
               className="p-2.5 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-2xl transition-all shadow-sm active:scale-95"
@@ -570,6 +595,18 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
           </div>
         </div>
       </div>
+
+      {showEditModal && (
+        <LeadFormModal
+          lead={lead}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => {
+            setShowEditModal(false);
+            refetch();
+            onUpdated();
+          }}
+        />
+      )}
     </div>
   );
 }

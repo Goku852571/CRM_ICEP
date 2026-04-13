@@ -8,24 +8,25 @@ import { useAuth } from '@/shared/hooks/useAuth';
 interface Props {
   onClose: () => void;
   onSuccess: () => void;
+  lead?: Lead | null;
 }
 
-export default function LeadFormModal({ onClose, onSuccess }: Props) {
+export default function LeadFormModal({ onClose, onSuccess, lead }: Props) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState<{ id: number; name: string }[]>([]);
   
   const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    city: '',
-    id_number: '',
-    profession: '',
-    country: '',
-    course_interest_id: '',
-    source: 'manual',
-    status: 'new'
+    name: lead?.name || '',
+    phone: lead?.phone || '',
+    email: lead?.email || '',
+    city: lead?.city || '',
+    id_number: lead?.id_number || '',
+    profession: lead?.profession || '',
+    country: lead?.country || '',
+    course_interest_id: lead?.course_interest_id?.toString() || '',
+    source: lead?.source || 'manual',
+    status: lead?.status || 'new'
   });
 
   useEffect(() => {
@@ -60,11 +61,17 @@ export default function LeadFormModal({ onClose, onSuccess }: Props) {
         country: formData.country || null,
       };
 
-      await createLead(payload);
-      showSuccess('Éxito', 'Lead creado correctamente');
+      if (lead) {
+        const { updateLead } = await import('../services/leadService');
+        await updateLead(lead.id, payload);
+        showSuccess('Éxito', 'Lead actualizado correctamente');
+      } else {
+        await createLead(payload);
+        showSuccess('Éxito', 'Lead creado correctamente');
+      }
       onSuccess();
     } catch (err) {
-      showError('Error', 'No se pudo crear el lead en el servidor');
+      showError('Error', `No se pudo ${lead ? 'actualizar' : 'crear'} el lead en el servidor`);
       console.error(err);
     } finally {
       setLoading(false);
@@ -84,9 +91,12 @@ export default function LeadFormModal({ onClose, onSuccess }: Props) {
         <div className="flex items-center justify-between p-6 border-b shrink-0 bg-surface-container-lowest">
           <div>
             <h2 className="text-xl font-headline font-bold text-primary flex items-center gap-2">
-              <Plus className="text-secondary" /> Registro de Nuevo Lead
+              {lead ? <Search className="text-secondary" /> : <Plus className="text-secondary" />} 
+              {lead ? 'Editar Información del Lead' : 'Registro de Nuevo Lead'}
             </h2>
-            <p className="text-xs font-medium text-on-surface-variant/70 mt-0.5">Asegúrese de capturar la mayor cantidad de información posible</p>
+            <p className="text-xs font-medium text-on-surface-variant/70 mt-0.5">
+              {lead ? 'Actualice los datos necesarios para este prospecto' : 'Asegúrese de capturar la mayor cantidad de información posible'}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-surface-container-high rounded-xl transition text-on-surface-variant">
             <X size={20} />
@@ -249,7 +259,7 @@ export default function LeadFormModal({ onClose, onSuccess }: Props) {
             disabled={loading}
             className="px-8 py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition disabled:opacity-50 flex items-center gap-3"
           >
-            {loading ? 'CREANDO...' : 'REGISTRAR LEAD'}
+            {loading ? (lead ? 'ACTUALIZANDO...' : 'CREANDO...') : (lead ? 'GUARDAR CAMBIOS' : 'REGISTRAR LEAD')}
             <ChevronRight size={18} strokeWidth={3} />
           </button>
         </div>

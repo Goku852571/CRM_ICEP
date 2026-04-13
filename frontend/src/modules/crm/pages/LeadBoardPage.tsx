@@ -55,11 +55,17 @@ export default function LeadBoardPage() {
     if (!destination) return;
     if (source.droppableId === destination.droppableId) return; // Same column
 
-    const leadId = parseInt(draggableId.split('-')[1]);
+    const leadIdStr = draggableId.split('-')[1];
+    const leadId = parseInt(leadIdStr);
     const newStatus = destination.droppableId;
 
-    // Optimistic UI could be implemented here for instant feedback, 
-    // but React Query invalidate is fast enough for now
+    // PROTECTION: UI Check to prevent dragging back to 'new'
+    const lead = leads.find(l => l.id === leadId);
+    if (lead && lead.status !== 'new' && newStatus === 'new') {
+        showError('Operación no permitida', 'No se puede regresar un contacto a la fase Nuevo.');
+        return;
+    }
+
     updateStatusMutation.mutate({ id: leadId, status: newStatus });
   };
 
@@ -78,7 +84,7 @@ export default function LeadBoardPage() {
     const matchesAdvisor = advisorFilter ? lead.advisor_id?.toString() === advisorFilter : true;
     
     return matchesSearch && matchesSource && matchesCourse && matchesAdvisor;
-  });
+  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-surface-container-lowest font-body">
