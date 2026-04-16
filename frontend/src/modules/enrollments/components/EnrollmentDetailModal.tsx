@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getEnrollment, updateEnrollmentStatus, confirmPayment, EnrollmentForm } from '../services/enrollmentService';
-import { X, Clock, User, Link as LinkIcon, AlertCircle, MapPin, CreditCard, Mail, Phone, Calendar, ShieldCheck, CheckCircle2, Zap, Copy, ExternalLink, Upload, Image, ThumbsUp, ThumbsDown, Eye } from 'lucide-react';
+import { X, Clock, User, Link as LinkIcon, AlertCircle, MapPin, CreditCard, Mail, Phone, Calendar, ShieldCheck, CheckCircle2, Zap, Copy, ExternalLink, Upload, ThumbsUp, ThumbsDown, Eye, Edit3 } from 'lucide-react';
 import { useAuth } from '@/shared/hooks/useAuth';
-import { showSuccess, showError } from '@/shared/utils/alerts';
+import { showSuccess, showError, showConfirm } from '@/shared/utils/alerts';
+import clsx from 'clsx';
+
 import PaymentVoucherModal from './PaymentVoucherModal';
 
 interface Props {
@@ -31,9 +33,13 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
   const [statusNotes, setStatusNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showVoucherPreview, setShowVoucherPreview] = useState(false);
+  const [selectedInstallment, setSelectedInstallment] = useState<number | null>(null);
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [showVoucherPreview, setShowVoucherPreview] = useState<string | null>(null);
+  const [paymentMode, setPaymentMode] = useState<'single' | 'installments'>('installments');
+
   const [rejectNotes, setRejectNotes] = useState('');
-  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+  const [showRejectConfirm, setShowRejectConfirm] = useState<number | null>(null);
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -79,18 +85,18 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
     }
   };
 
-  const handleConfirmPayment = async (action: 'confirm' | 'reject') => {
-    if (isUpdating) return;
+  const handleConfirmPayment = async (action: 'confirm' | 'reject', paymentId?: number) => {
+    if (isUpdating || !paymentId) return;
     setIsUpdating(true);
     try {
       await confirmPayment(enrollmentId, action, action === 'reject' ? rejectNotes : undefined);
       showSuccess(
         action === 'confirm' ? '✅ Pago Confirmado' : '❌ Pago Rechazado',
         action === 'confirm'
-          ? 'El asesor puede proceder a solicitar la matrícula.'
+          ? 'El abono ha sido verificado correctamente.'
           : 'El asesor fue notificado para reintentar el pago.'
       );
-      setShowRejectConfirm(false);
+      setShowRejectConfirm(null);
       setRejectNotes('');
       broadcast();
       onUpdate();
@@ -260,160 +266,235 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
                 </div>
               </div>
 
-              {/* ─── PAYMENT VOUCHER INFO (visible when payment_pending or after) ─── */}
-              {['payment_pending', 'payment_confirmed', 'in_review', 'approved'].includes(status) && enrollment.bank_transaction_id && (
-                <div className={`p-6 rounded-3xl border-2 space-y-4 transition-all duration-500 ${status === 'payment_pending' ? 'bg-[#7a142c]/5 border-[#7a142c]/10' : 'bg-[#20325e]/5 border-[#20325e]/10'}`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <div className={`h-10 w-10 rounded-2xl flex items-center justify-center shadow-sm ${status === 'payment_pending' ? 'bg-[#7a142c]/10 text-[#7a142c]' : 'bg-[#20325e]/10 text-[#20325e]'}`}><CreditCard size={20} /></div>
-                    <div>
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${status === 'payment_pending' ? 'text-[#7a142c]/60' : 'text-[#20325e]/60'}`}>Comprobante de Pago</p>
-                      <p className={`text-sm font-black ${status === 'payment_pending' ? 'text-[#7a142c]' : 'text-[#20325e]'}`}>N° Transacción: <span className="font-mono">{enrollment.bank_transaction_id}</span></p>
-                    </div>
-                    {status === 'payment_confirmed' && <span className="sm:ml-auto w-fit px-3 py-1 rounded-full bg-[#20325e] text-white text-[10px] font-black uppercase shadow-sm">Verificado ✓</span>}
-                    {status === 'payment_pending' && <span className="sm:ml-auto w-fit px-3 py-1 rounded-full bg-[#7a142c] text-white text-[10px] font-black uppercase shadow-sm animate-pulse">En Revisión...</span>}
+              {/* ─── QUOTA PAYMENT GRID ─── */}
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm"><CreditCard size={20} /></div>
+                    <h3 className="text-xs font-black text-on-surface-variant uppercase tracking-[0.2em]">Gestión de Cuotas y Pagos</h3>
                   </div>
-
-                  {/* Jefe asignado */}
-                  {enrollment.paymentRequestedTo && (
-                    <div className={`flex items-center gap-3 text-sm ${status === 'payment_pending' ? 'text-[#7a142c]/80' : 'text-[#20325e]/80'}`}>
-                      <User size={14} className="shrink-0" />
-                      <span className="font-medium">
-                        {status === 'payment_confirmed' ? 'Verificado por:' : 'Enviado para verificación a:'}{' '}
-                        <strong>{(enrollment.paymentConfirmedBy ?? enrollment.paymentRequestedTo as any)?.name}</strong>
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Vista previa del comprobante */}
-                  {voucherUrl && (
-                    <div>
-                      <button onClick={() => setShowVoucherPreview(!showVoucherPreview)} className={`flex items-center gap-2 text-xs font-black transition-all mb-3 ${status === 'payment_pending' ? 'text-[#7a142c] hover:opacity-70' : 'text-[#20325e] hover:opacity-70'}`}>
-                        <Eye size={14} /> {showVoucherPreview ? 'Ocultar' : 'Ver'} Comprobante
-                      </button>
-                      {showVoucherPreview && (
-                        <div className={`rounded-2xl overflow-hidden border-2 shadow-lg animate-in fade-in duration-300 ${status === 'payment_pending' ? 'border-[#7a142c]/20' : 'border-[#20325e]/20'}`}>
-                          {enrollment.payment_voucher_path?.endsWith('.pdf') ? (
-                            <a href={voucherUrl} target="_blank" rel="noreferrer" className={`flex items-center gap-3 p-4 bg-white transition-all ${status === 'payment_pending' ? 'hover:bg-[#7a142c]/5 text-[#7a142c]' : 'hover:bg-[#20325e]/5 text-[#20325e]'}`}>
-                              <CreditCard size={20} /> <span className="text-sm font-bold">Ver PDF del Comprobante</span>
-                            </a>
-                          ) : (
-                            <img src={voucherUrl} alt="Comprobante de pago" className="w-full max-h-72 object-contain bg-white p-2" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="bg-surface-container-low px-4 py-1.5 rounded-2xl flex items-center gap-4 border border-outline-variant/10 text-xs font-bold">
+                    <span className="text-on-surface-variant/60 uppercase text-[9px] tracking-widest">Valor Total:</span>
+                    <span className="text-primary font-black text-sm">${enrollment.sale_value?.toLocaleString() || '---'}</span>
+                  </div>
                 </div>
-              )}
 
-              {/* ─── ACTION BANNER ─── */}
-              {status === 'completed' && (
-                <div className="relative overflow-hidden p-8 rounded-[2rem] bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-xl shadow-amber-200 animate-in slide-in-from-bottom-4 duration-500">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
-                  <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="text-center md:text-left">
-                      <h4 className="text-xl font-black mb-2 flex items-center gap-3"><Upload /> Siguiente Paso</h4>
-                      <p className="text-sm opacity-90 max-w-sm">El formulario está completo. Sube el comprobante de pago para que el jefe lo verifique.</p>
-                    </div>
+                {(!enrollment.payments || enrollment.payments.length === 0) && (enrollment.course?.installments_count ?? 1) > 1 && (
+                  <div className="p-1.5 bg-surface-container-lowest rounded-2xl flex max-w-sm border border-outline-variant/10">
                     <button
-                      onClick={() => setShowPaymentModal(true)}
-                      className="group w-full md:w-auto h-16 px-10 rounded-2xl bg-white text-amber-600 font-black text-lg shadow-2xl hover:bg-amber-50 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3"
+                      onClick={() => setPaymentMode('single')}
+                      className={clsx('flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all', paymentMode === 'single' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant/50 hover:bg-surface-container')}
                     >
-                      <CreditCard size={22} /> SUBIR COMPROBANTE
+                      Pago Único
+                    </button>
+                    <button
+                      onClick={() => setPaymentMode('installments')}
+                      className={clsx('flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all', paymentMode === 'installments' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant/50 hover:bg-surface-container')}
+                    >
+                      Pago en Cuotas
                     </button>
                   </div>
-                </div>
-              )}
+                )}
 
-              {status === 'payment_pending' && canConfirmPayment && (
-                <div className="relative overflow-hidden p-6 sm:p-8 rounded-[2rem] bg-gradient-to-br from-[#7a142c] to-[#921a35] text-white shadow-xl shadow-[#7a142c]/20 animate-in slide-in-from-bottom-4 duration-500">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
-                  <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="text-center md:text-left">
-                      <h4 className="text-lg sm:text-xl font-black mb-2 flex items-center justify-center md:justify-start gap-3">
-                        <ShieldCheck /> Verificación de Pago
-                      </h4>
-                      <p className="text-xs sm:text-sm opacity-90 max-w-sm">
-                        Confirmación exclusiva para el Jefe asignado. Revisa los datos bancarios y el comprobante para proceder.
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-4 w-full md:w-auto">
-                      {/* Información de Pago para el Jefe */}
-                      <div className="bg-white/10 p-4 rounded-xl border border-white/20 backdrop-blur-sm">
-                        <p className="text-[10px] font-black uppercase mb-1 opacity-70">N° Transacción</p>
-                        <p className="font-mono text-base sm:text-lg font-black">{enrollment.bank_transaction_id}</p>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                  {Array.from({ 
+                    length: (!enrollment.payments || enrollment.payments.length === 0) 
+                            ? (paymentMode === 'single' ? 1 : (enrollment.course?.installments_count ?? 1))
+                            : ((enrollment.payments.length === 1 && enrollment.balance_due !== null && enrollment.balance_due <= 0) ? 1 : (enrollment.course?.installments_count ?? 1))
+                  }).map((_, idx) => {
+                    const installmentNum = idx + 1;
+                    const payment = enrollment.payments?.find(p => p.installment_number === installmentNum);
+                    
+                    const isPreviousPaid = idx === 0 || (() => {
+                      const prevPayment = enrollment.payments?.find(p => p.installment_number === idx);
+                      return prevPayment && prevPayment.status === 'confirmed';
+                    })();
 
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        {!showRejectConfirm ? (
-                          <>
-                            <button
-                              onClick={() => setShowRejectConfirm(true)}
-                              disabled={isUpdating}
-                              className="w-full sm:w-auto h-12 sm:h-14 px-6 rounded-2xl bg-white/20 hover:bg-white/30 text-white font-black transition-all flex items-center justify-center gap-2 border-2 border-white/30 text-sm"
-                            >
-                              <ThumbsDown size={18} /> Rechazar
-                            </button>
-                            <button
-                              onClick={() => handleConfirmPayment('confirm')}
-                              disabled={isUpdating}
-                              className="w-full sm:w-auto flex-1 h-12 sm:h-14 px-8 rounded-2xl bg-white text-[#7a142c] font-black shadow-2xl hover:bg-red-50 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base whitespace-nowrap"
-                            >
-                              {isUpdating ? <div className="h-5 w-5 border-4 border-white/20 border-t-white rounded-full animate-spin" /> : <><ThumbsUp size={18} /> CONFIRMAR PAGO</>}
-                            </button>
-                          </>
-                        ) : (
-                          <div className="w-full space-y-3 animate-in slide-in-from-right duration-300">
-                            <input type="text" value={rejectNotes} onChange={e => setRejectNotes(e.target.value)} placeholder="Motivo del rechazo (opcional)..." className="w-full h-12 px-4 rounded-xl bg-white/20 border border-white/30 text-white placeholder:text-white/50 outline-none text-sm font-medium" autoFocus />
-                            <div className="flex flex-col sm:flex-row gap-3">
-                              <button onClick={() => setShowRejectConfirm(false)} className="w-full sm:flex-1 h-12 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-all">Cancelar</button>
-                              <button onClick={() => handleConfirmPayment('reject')} disabled={isUpdating} className="w-full sm:flex-1 h-12 rounded-xl bg-red-500 hover:bg-red-400 text-white font-black transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                {isUpdating ? '...' : <><ThumbsDown size={16} /> Confirmar Rechazo</>}
+                    
+                    let cardStyle = "bg-white border-2 border-outline-variant/10";
+                    let stateIcon = <Clock className="text-on-surface-variant/30" />;
+                    let stateLabel = "Pendiente";
+                    let stateColor = "text-on-surface-variant/40";
+                    let bgColor = "bg-surface-container-lowest";
+
+                    if (payment) {
+                      if (payment.status === 'confirmed') {
+                        cardStyle = "bg-emerald-50 border-emerald-200 shadow-md";
+                        stateIcon = <CheckCircle2 className="text-emerald-500" />;
+                        stateLabel = "Pagada";
+                        stateColor = "text-emerald-700 font-black";
+                        bgColor = "bg-emerald-100/50";
+                      } else if (payment.status === 'pending_verification') {
+                        cardStyle = "bg-amber-50 border-amber-200 shadow-md animate-in fade-in";
+                        stateIcon = <Clock className="text-amber-500 animate-pulse" />;
+                        stateLabel = "En Validación";
+                        stateColor = "text-amber-700 font-black";
+                        bgColor = "bg-amber-100/50";
+                      } else {
+                        cardStyle = "bg-red-50 border-red-200";
+                        stateIcon = <AlertCircle className="text-red-500" />;
+                        stateLabel = "Rechazada";
+                        stateColor = "text-red-700 font-black";
+                        bgColor = "bg-red-100/50";
+                      }
+                    }
+
+                    const isJefeOfThisPayment = payment && !!user && Number(payment.payment_requested_to) === Number((user as any).id);
+
+                    return (
+                      <div key={installmentNum} className={clsx("relative p-5 rounded-[2rem] transition-all duration-300", cardStyle)}>
+                        <div className="flex items-center justify-between mb-4">
+                           <div className="flex items-center gap-3">
+                              <div className={clsx("h-10 w-10 rounded-2xl flex items-center justify-center font-black text-sm", bgColor, payment?.status === 'confirmed' ? 'text-emerald-600' : payment?.status === 'pending_verification' ? 'text-amber-600' : 'text-on-surface-variant/40')}>
+                                {installmentNum}
+                              </div>
+                              <div>
+                                <h4 className="font-headline font-black text-primary uppercase text-xs tracking-widest">Cuota {installmentNum}</h4>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  {stateIcon}
+                                  <span className={clsx("text-[9px] uppercase tracking-tighter", stateColor)}>{stateLabel}</span>
+                                </div>
+                              </div>
+                           </div>
+                           
+                           {payment?.status === 'confirmed' && (
+                              <button 
+                                onClick={async () => {
+                                  const confirmed = await showConfirm(
+                                    '¿Editar Pago Confirmado?',
+                                    'Estás a punto de modificar un pago que ya ha sido verificado. Esta acción quedará registrada en el historial de auditoría e impactará los saldos totales.',
+                                    'Sí, deseo editar',
+                                    'Cancelar'
+                                  );
+                                  if (confirmed) {
+                                    setSelectedInstallment(installmentNum);
+                                    setEditingPaymentId(payment.id);
+                                    setShowPaymentModal(true);
+                                  }
+                                }}
+                                className="p-2 rounded-xl bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors"
+                                title="Editar datos del pago"
+                              >
+                                <Edit3 size={14} />
                               </button>
+                           )}
+
+                        </div>
+
+                        {payment ? (
+                          <div className="space-y-3">
+                            <div className="bg-primary/5 px-4 py-3 rounded-2xl border border-primary/10">
+                              <p className="text-[8px] font-black text-primary/50 uppercase tracking-[0.2em] mb-1">
+                                Número de Transacción Bancaria
+                              </p>
+                              <p className="font-mono text-primary font-black text-lg select-all truncate">
+                                {payment.bank_transaction_id}
+                              </p>
                             </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="bg-white p-2.5 rounded-xl border border-outline-variant/10 shadow-sm">
+                                <p className="text-[8px] font-bold text-on-surface-variant/40 uppercase mb-1">Monto del Pago</p>
+                                <p className="text-sm font-black text-primary">${payment.amount.toLocaleString()}</p>
+                              </div>
+                              <div className="bg-white p-2.5 rounded-xl border border-outline-variant/10 shadow-sm">
+                                <p className="text-[8px] font-bold text-on-surface-variant/40 uppercase mb-1">Banco</p>
+                                <p className="text-[10px] font-black text-primary uppercase truncate">
+                                  {payment.bank_name || "—"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="px-1 flex justify-between items-center text-[9px] border-t border-outline-variant/5 pt-2">
+                              <span className="text-on-surface-variant/40 font-bold uppercase">Solicitud enviada a:</span>
+                              <span className="text-primary font-black uppercase">
+                                {payment.paymentRequestedTo?.name || "Sistema"}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              {payment.payment_voucher_path && (
+                                <button 
+                                  onClick={() => setShowVoucherPreview(`${window.location.origin}/api/v1/storage/${payment.payment_voucher_path}`)}
+                                  className="flex-1 h-9 rounded-xl bg-white border border-outline-variant/10 text-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary hover:text-white transition-all transition-all"
+                                >
+                                  <Eye size={12} /> Comprobante
+                                </button>
+                              )}
+                              {payment.status === 'pending_verification' && isJefeOfThisPayment && (
+                                <div className="flex gap-2">
+                                  <button 
+                                    onClick={() => setShowRejectConfirm(payment.id)}
+                                    className="h-9 w-9 flex items-center justify-center rounded-xl bg-red-100 text-red-600 hover:bg-red-200 transition-all"
+                                  ><ThumbsDown size={14} /></button>
+                                  <button 
+                                    onClick={() => handleConfirmPayment('confirm', payment.id)}
+                                    className="h-9 px-4 flex items-center justify-center rounded-xl bg-emerald-600 text-white font-black text-[10px] uppercase shadow-lg shadow-emerald-200 hover:scale-105 active:scale-95 transition-all"
+                                  >✓</button>
+                                </div>
+                              )}
+                            </div>
+
+                            {showRejectConfirm === payment.id && (
+                              <div className="mt-3 p-3 bg-red-100 rounded-2xl animate-in slide-in-from-top-2">
+                                <input 
+                                  value={rejectNotes}
+                                  onChange={e => setRejectNotes(e.target.value)}
+                                  placeholder="Motivo rechazo..." 
+                                  className="w-full h-8 px-2 text-[10px] rounded-lg bg-white outline-none mb-2"
+                                />
+                                <div className="flex gap-2">
+                                  <button onClick={() => setShowRejectConfirm(null)} className="flex-1 text-[9px] font-bold">No</button>
+                                  <button onClick={() => handleConfirmPayment('reject', payment.id)} className="flex-1 h-7 bg-red-500 text-white rounded-lg text-[9px] font-black">SÍ, RECHAZAR</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="py-2">
+                            {(enrollment.advisor_id === (user as any)?.id || hasRole('admin')) ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedInstallment(installmentNum);
+                                  setShowPaymentModal(true);
+                                }}
+                                disabled={!isPreviousPaid}
+                                className={clsx(
+                                  "w-full h-12 rounded-2xl border-2 border-dashed font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
+                                  isPreviousPaid 
+                                    ? "bg-white border-primary/20 text-primary hover:border-primary hover:bg-primary/5 cursor-pointer"
+                                    : "bg-surface-container border-outline-variant/10 text-on-surface-variant/30 cursor-not-allowed"
+                                )}
+                              >
+                                <Upload size={14} /> Registrar Pago
+                              </button>
+                            ) : (
+                              <div className="text-[10px] text-on-surface-variant/30 italic text-center py-2">
+                                Esperando registro
+                              </div>
+                            )}
+                            {!isPreviousPaid && (
+                               <p className="text-[9px] text-center text-on-surface-variant/40 mt-2 font-bold uppercase">
+                                 Paga la cuota anterior primero
+                               </p>
+                            )}
                           </div>
                         )}
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
 
-              {status === 'payment_pending' && !canConfirmPayment && (
-                <div className="p-6 rounded-2xl bg-[#7a142c]/5 border border-[#7a142c]/20 flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-[#7a142c]/10 flex items-center justify-center text-[#7a142c] animate-pulse shrink-0"><Clock size={20} /></div>
-                  <div>
-                    <p className="font-black text-[#7a142c] text-sm">Verificación de Pago Pendiente</p>
-                    <p className="text-xs text-[#7a142c]/70 mt-0.5">
-                      Tu comprobante ha sido enviado a <strong>
-                        {typeof (enrollment as any).payment_requested_to === 'object'
-                          ? (enrollment as any).payment_requested_to?.name
-                          : (enrollment as any).paymentRequestedTo?.name || 'un Jefe'}
-                      </strong> para su revisión.
-                    </p>
-                    <div className="flex items-center gap-2 mt-2 bg-[#7a142c]/10 w-fit px-3 py-1.5 rounded-full">
-                      <div className="w-5 h-5 rounded-full bg-[#7a142c]/40 flex items-center justify-center text-[10px] text-white font-bold overflow-hidden">
-                        {(typeof (enrollment as any).payment_requested_to === 'object'
-                          ? (enrollment as any).payment_requested_to?.name
-                          : (enrollment as any).paymentRequestedTo?.name || 'J')?.charAt(0)}
-                      </div>
-                      <span className="text-[10px] font-black text-[#7a142c] uppercase tracking-tight">
-                        Asignado a: {typeof (enrollment as any).payment_requested_to === 'object'
-                          ? (enrollment as any).payment_requested_to?.name
-                          : (enrollment as any).paymentRequestedTo?.name || 'Revisión en curso'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {status === 'payment_confirmed' && (
+              {/* ─── ACTION BANNER ─── */}
+              {/* ─── ACTION BANNER (Solicitar Matrícula) ─── */}
+              {status !== 'approved' && status !== 'in_review' && enrollment.payments?.some(p => p.installment_number === 1 && p.status === 'confirmed') && (
                 <div className="relative overflow-hidden p-8 rounded-[2rem] bg-gradient-to-br from-[#20325e] to-[#2a4078] text-white shadow-xl shadow-[#20325e]/20 animate-in slide-in-from-bottom-4 duration-500">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
                   <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
                     <div>
                       <h4 className="text-xl font-black mb-2 flex items-center gap-3"><CheckCircle2 /> Pago Verificado</h4>
-                      <p className="text-sm opacity-90 max-w-sm">El pago fue confirmado. Ahora puedes solicitar formalmente la matrícula al administrador.</p>
+                      <p className="text-sm opacity-90 max-w-sm">La Cuota 1 ha sido confirmada. Ahora puedes solicitar formalmente la matrícula al administrador.</p>
                     </div>
                     <button
                       onClick={() => handleStatusChange('in_review')}
@@ -485,23 +566,35 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
       {/* Payment Voucher Sub-modal */}
       {showPaymentModal && (
         <PaymentVoucherModal
-          enrollmentId={enrollmentId}
-          studentName={enrollment.student_name}
-          onClose={() => setShowPaymentModal(false)}
+          enrollment={enrollment}
+          installmentNumber={selectedInstallment ?? 1}
+          paymentId={editingPaymentId ?? undefined}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setSelectedInstallment(null);
+            setEditingPaymentId(null);
+          }}
           onSuccess={async () => {
             setShowPaymentModal(false);
+            setSelectedInstallment(null);
+            setEditingPaymentId(null);
             broadcast();
             onUpdate();
             await fetchDetail();
           }}
         />
+
       )}
 
       {/* Full-screen voucher viewer */}
-      {showVoucherPreview && voucherUrl && !enrollment.payment_voucher_path?.endsWith('.pdf') && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4" onClick={() => setShowVoucherPreview(false)}>
-          <img src={voucherUrl} alt="Comprobante" className="max-h-[90vh] max-w-[90vw] rounded-2xl shadow-2xl object-contain" />
-          <button onClick={() => setShowVoucherPreview(false)} className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all">
+      {showVoucherPreview && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4" onClick={() => setShowVoucherPreview(null)}>
+          {showVoucherPreview.endsWith('.pdf') ? (
+            <iframe src={showVoucherPreview} className="w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl" />
+          ) : (
+            <img src={showVoucherPreview} alt="Comprobante" className="max-h-[90vh] max-w-[90vw] rounded-2xl shadow-2xl object-contain" />
+          )}
+          <button onClick={() => setShowVoucherPreview(null)} className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all">
             <X size={24} />
           </button>
         </div>

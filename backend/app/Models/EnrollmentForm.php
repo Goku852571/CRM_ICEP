@@ -80,4 +80,9 @@ class EnrollmentForm extends Model
     {
         return $this->belongsTo(User::class, 'payment_confirmed_by');
     }
+
+    public function payments()
+    {
+        return $this->hasMany(EnrollmentPayment::class, 'enrollment_form_id');
+    }
 }

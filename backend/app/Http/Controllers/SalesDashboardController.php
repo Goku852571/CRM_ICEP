@@ -211,6 +211,9 @@ class SalesDashboardController extends Controller
         $query = EnrollmentForm::with([
             'advisor:id,name',
             'course:id,name,enrollment_value,installments_count,installment_value',
+            'payments',
+            'payments.paymentRequestedTo:id,name',
+            'payments.paymentConfirmedBy:id,name',
         ])->whereBetween('created_at', [$startDate, $endDate]);
 
         if ($request->filled('advisor_id')) {

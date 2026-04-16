@@ -65,6 +65,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('/enrollments/{enrollment}/status', [\App\Http\Controllers\EnrollmentFormController::class, 'updateStatus']);
         Route::post('/enrollments/{enrollment}/payment', [\App\Http\Controllers\EnrollmentFormController::class, 'submitPayment']);
         Route::post('/enrollments/{enrollment}/confirm-payment', [\App\Http\Controllers\EnrollmentFormController::class, 'confirmPayment']);
+        Route::patch('/enrollments/{enrollment}/payments/{paymentId}', [\App\Http\Controllers\EnrollmentFormController::class, 'updatePayment']);
 
         // Calendario (Eventos)
         Route::apiResource('events', \App\Http\Controllers\EventController::class);

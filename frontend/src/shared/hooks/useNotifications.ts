@@ -12,6 +12,7 @@ export interface Notification {
     message: string;
     ticket_id?: number;
     enrollment_id?: number;
+    lead_id?: number;
   };
   read_at: string | null;
   created_at: string;

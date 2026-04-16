@@ -21,7 +21,7 @@ class EnrollmentFormController extends ApiController
 {
     public function index(Request $request): JsonResponse
     {
-        $query = EnrollmentForm::with(['advisor', 'course'])
+        $query = EnrollmentForm::with(['advisor', 'course', 'payments.paymentRequestedTo'])
             ->orderBy('created_at', 'desc');
 
         if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_asesores')) {
@@ -80,7 +80,7 @@ class EnrollmentFormController extends ApiController
     {
         $enrollment = EnrollmentForm::with([
             'advisor', 'course', 'histories.user',
-            'paymentRequestedTo', 'paymentConfirmedBy'
+            'paymentRequestedTo', 'paymentConfirmedBy', 'payments.paymentRequestedTo'
         ])->findOrFail($id);
 
         if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe') && !$request->user()->hasRole('jefe_asesores')) {
@@ -163,46 +163,90 @@ class EnrollmentFormController extends ApiController
         return $this->success($enrollment->fresh(['advisor', 'course', 'paymentRequestedTo', 'paymentConfirmedBy']), 'Estado actualizado');
     }
 
-    /**
-     * Asesor sube comprobante de pago y selecciona jefe para la verificación.
-     */
     public function submitPayment(Request $request, $id): JsonResponse
     {
         $enrollment = EnrollmentForm::findOrFail($id);
 
-        // Solo el asesor dueño, jefe o admin puede hacer esto
         if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe')) {
             if ($enrollment->advisor_id !== $request->user()->id) {
                 return response()->json(['message' => 'No autorizado'], 403);
             }
         }
 
-        if ($enrollment->status !== 'completed') {
-            return $this->error('El formulario debe estar en estado completado para enviar el pago.', 422);
+        // Ya no impedimos que sea diferente de 'completed'. Podría ser 'payment_pending', 'partial' etc.
+        // Pero sí validamos que no esté en estados iniciales
+        if (in_array($enrollment->status, ['pending_send', 'sent'])) {
+            return $this->error('Formulario no ha sido completado por el cliente.', 422);
         }
 
         $request->validate([
-            'bank_transaction_id'  => 'required|string|unique:enrollment_forms,bank_transaction_id',
-            'payment_concept'      => 'required|string|max:50',
+            'installment_number'   => 'required|integer|min:1',
+            'bank_transaction_id'  => 'required|string|unique:enrollment_payments,bank_transaction_id',
+            'amount'               => 'required|numeric|min:0.01',
             'payment_voucher'      => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
             'payment_requested_to' => 'required|exists:users,id',
+            'sale_value'           => 'nullable|numeric|min:0',
+            'requires_billing'     => 'nullable|boolean',
+            'bank_name'            => 'nullable|string',
         ], [
             'bank_transaction_id.unique' => 'Este número de transacción ya fue registrado. Verifica el comprobante.',
-            'payment_concept.required'   => 'Debes indicar el concepto del pago.',
             'payment_voucher.required'   => 'Debes subir el comprobante de pago.',
             'payment_voucher.mimes'      => 'El comprobante debe ser una imagen (JPG, PNG) o PDF.',
-            'payment_voucher.max'        => 'El archivo no puede superar los 5 MB.',
+            'amount.required'            => 'Debes ingresar el monto a pagar.',
         ]);
 
-        // Guardar el archivo
+        // Validar que la cuota no esté ya confirmada
+        $existingConfirmed = $enrollment->payments()
+            ->where('installment_number', $request->installment_number)
+            ->where('status', 'confirmed')
+            ->exists();
+
+        if ($existingConfirmed) {
+            return $this->error('Esta cuota ya ha sido pagada y confirmada. No se puede subir información adicional.', 422);
+        }
+
+
+        if ($request->filled('sale_value') && !$enrollment->sale_value) {
+            $course = $enrollment->course;
+            if ($course && $request->sale_value < $course->min_price) {
+                return $this->error('El valor de venta no puede ser inferior a la Inversión Mínima (' . $course->min_price . ').', 422);
+            }
+        }
+
         $path = $request->file('payment_voucher')->store('payment_vouchers', 'public');
 
-        $oldStatus = $enrollment->status;
-        $enrollment->update([
-            'status'               => 'payment_pending',
+        $updates = [];
+        if (!in_array($enrollment->status, ['approved', 'in_review'])) {
+             // Si aún no está aprobada formalmente la matrícula, lo dejamos en verificando.
+             $updates['status'] = 'payment_pending';
+        }
+        
+        if ($request->filled('sale_value') && !$enrollment->sale_value) {
+            $updates['sale_value'] = $request->sale_value;
+            $updates['balance_due'] = $request->sale_value - ($enrollment->total_paid ?? 0);
+        }
+        if ($request->filled('requires_billing')) {
+            $updates['requires_billing'] = filter_var($request->requires_billing, FILTER_VALIDATE_BOOLEAN);
+        }
+        if ($request->filled('bank_name') && !$enrollment->bank_name) {
+            $updates['bank_name'] = $request->bank_name;
+        }
+        // Save the latest voucher to the form itself for legacy view (can be removed later)
+        $updates['bank_transaction_id'] = $request->bank_transaction_id;
+        $updates['payment_voucher_path'] = $path;
+        $updates['payment_requested_to'] = $request->payment_requested_to;
+        $updates['payment_concept'] = 'Cuota ' . $request->installment_number;
+
+        $enrollment->update($updates);
+
+        $payment = $enrollment->payments()->create([
+            'amount'               => $request->amount,
+            'installment_number'   => $request->installment_number,
             'bank_transaction_id'  => $request->bank_transaction_id,
-            'payment_concept'      => $request->payment_concept,
             'payment_voucher_path' => $path,
+            'payment_concept'      => 'Cuota ' . $request->installment_number,
+            'bank_name'            => $request->filled('bank_name') ? $request->bank_name : $enrollment->bank_name,
+            'status'               => 'pending_verification',
             'payment_requested_to' => $request->payment_requested_to,
         ]);
 
@@ -210,38 +254,42 @@ class EnrollmentFormController extends ApiController
             'enrollment_form_id' => $enrollment->id,
             'user_id'            => $request->user()->id,
             'action'             => 'payment_submitted',
-            'old_status'         => $oldStatus,
-            'new_status'         => 'payment_pending',
-            'notes'              => 'Comprobante enviado. N° Transacción: ' . $request->bank_transaction_id,
+            'old_status'         => $enrollment->getOriginal('status'),
+            'new_status'         => $enrollment->status,
+            'notes'              => 'Comprobante de $' . $request->amount . ' enviado para Cuota ' . $request->installment_number . '. N° TXN: ' . $request->bank_transaction_id,
         ]);
 
-        // Notificar al jefe seleccionado
         /** @var \App\Models\User $jefe */
         $jefe = User::find($request->payment_requested_to);
         if ($jefe) {
-            $jefe->notify(new PaymentRequestedNotification(
-                $enrollment->load('course'),
-                $request->user()
-            ));
+            $jefe->notify(new PaymentRequestedNotification($enrollment->load('course'), $request->user()));
         }
 
-        return $this->success($enrollment->fresh(['advisor', 'course', 'paymentRequestedTo']), 'Comprobante enviado. El jefe será notificado.');
+        return $this->success($enrollment->fresh(['advisor', 'course', 'paymentRequestedTo', 'payments']), 'Comprobante enviado. Su estado es "En Validación".');
     }
 
     /**
-     * Jefe o Admin confirma o rechaza el pago.
+     * Jefe o Admin confirma o rechaza el pago global del expediente o múltiples pagos pendientes.
+     * En este caso confirmaremos todos los pagos pendientes dirigidos a este jefe.
      */
     public function confirmPayment(Request $request, $id): JsonResponse
     {
-        $enrollment = EnrollmentForm::with(['advisor', 'course'])->findOrFail($id);
+        $enrollment = EnrollmentForm::with(['advisor', 'course', 'payments'])->findOrFail($id);
 
-        // Restricción estricta: Solo el jefe al que se le solicitó puede confirmar
-        if ((int)$enrollment->payment_requested_to !== (int)$request->user()->id) {
-            return response()->json(['message' => 'No autorizado. Solo el Jefe específicamente asignado a esta verificación puede confirmar el pago.'], 403);
+        $pendingPayments = $enrollment->payments()
+            ->where('status', 'pending_verification')
+            ->where('payment_requested_to', $request->user()->id)
+            ->get();
+
+        if ($pendingPayments->isEmpty()) {
+             // Tratamos de buscar pagos que pueda aprobar como admin si aplica
+             if ($request->user()->hasRole('admin')) {
+                 $pendingPayments = $enrollment->payments()->where('status', 'pending_verification')->get();
+             }
         }
 
-        if ($enrollment->status !== 'payment_pending') {
-            return $this->error('El expediente no está en estado de verificación de pago.', 422);
+        if ($pendingPayments->isEmpty()) {
+            return $this->error('No tienes pagos pendientes de verificación asociados a este expediente.', 422);
         }
 
         $request->validate([
@@ -249,50 +297,105 @@ class EnrollmentFormController extends ApiController
             'notes'  => 'nullable|string',
         ]);
 
-        $newStatus = $request->action === 'confirm' ? 'payment_confirmed' : 'completed';
         $oldStatus = $enrollment->status;
+        $totalApprovedInThisRequest = 0;
 
-        $updateData = [
-            'status' => $newStatus,
-        ];
-        if ($request->action === 'confirm') {
-            $updateData['payment_confirmed_by'] = $request->user()->id;
-            $updateData['payment_confirmed_at'] = now();
-        } else {
-            // Al rechazar, limpiar datos del pago para que el asesor pueda reintentar
-            $updateData['bank_transaction_id']  = null;
-            $updateData['payment_voucher_path'] = null;
-            $updateData['payment_requested_to'] = null;
+        foreach ($pendingPayments as $p) {
+            $p->update([
+                'status' => $request->action === 'confirm' ? 'confirmed' : 'rejected',
+                'payment_confirmed_by' => $request->user()->id,
+                'payment_confirmed_at' => now(),
+            ]);
+            if ($request->action === 'confirm') {
+                $totalApprovedInThisRequest += $p->amount;
+            }
         }
 
-        $enrollment->update($updateData);
+        // Recalcular saldo total pagado solo basados en pagos confirmados reales
+        $totalPaid = $enrollment->payments()->where('status', 'confirmed')->sum('amount');
+        $saleValue = $enrollment->sale_value ?? 0;
+        $balance = max(0, $saleValue - $totalPaid);
+        
+        $newFormStatus = $enrollment->status;
+        if ($request->action === 'confirm') {
+            if ($enrollment->status === 'payment_pending') {
+                $newFormStatus = 'payment_confirmed'; 
+            }
+        } else {
+             // Si era payment_pending y rechazamos todo lo que había, podemos retrocederlo
+             $remainingPending = $enrollment->payments()->where('status', 'pending_verification')->count();
+             if ($remainingPending === 0 && $totalPaid == 0) {
+                 $newFormStatus = 'completed';
+             }
+        }
+
+        $enrollment->update([
+            'status' => $newFormStatus,
+            'total_paid' => $totalPaid,
+            'balance_due' => $balance,
+        ]);
 
         EnrollmentFormHistory::create([
             'enrollment_form_id' => $enrollment->id,
             'user_id'            => $request->user()->id,
             'action'             => $request->action === 'confirm' ? 'payment_confirmed' : 'payment_rejected',
             'old_status'         => $oldStatus,
-            'new_status'         => $newStatus,
-            'notes'              => $request->notes ?? ($request->action === 'confirm' ? 'Pago verificado y confirmado.' : 'Pago rechazado. El asesor debe reintentar.'),
+            'new_status'         => $newFormStatus,
+            'notes'              => $request->notes ?? ($request->action === 'confirm' ? 'Pago(s) verificado(s) y sumado al saldo.' : 'Pago(s) rechazado(s).'),
         ]);
 
-        // Notificar al asesor
-        /** @var \App\Models\User $advisor */
         $advisor = User::find($enrollment->advisor_id);
         if ($advisor) {
             if ($request->action === 'confirm') {
                 $advisor->notify(new PaymentConfirmedNotification($enrollment, $request->user()));
             } else {
-                // Reutilizamos EnrollmentCompletedNotification con un mensaje de rechazo
-                // (podríamos crear otra, pero para simplificar)
                 $advisor->notify(new EnrollmentCompletedNotification($enrollment));
             }
         }
 
         return $this->success(
-            $enrollment->fresh(['advisor', 'course', 'paymentRequestedTo', 'paymentConfirmedBy']),
-            $request->action === 'confirm' ? 'Pago confirmado. El asesor puede proceder.' : 'Pago rechazado. El asesor fue notificado.'
+            $enrollment->fresh(['advisor', 'course', 'payments', 'paymentRequestedTo', 'paymentConfirmedBy']),
+            $request->action === 'confirm' ? 'Pago verificado y sumado al saldo.' : 'Pago rechazado.'
         );
+    }
+
+    public function updatePayment(Request $request, $id, $paymentId): JsonResponse
+    {
+        $enrollment = EnrollmentForm::findOrFail($id);
+        $payment = $enrollment->payments()->findOrFail($paymentId);
+
+        if (!$request->user()->hasRole('admin') && !$request->user()->hasRole('jefe')) {
+            if ($enrollment->advisor_id !== $request->user()->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+        }
+
+        $request->validate([
+            'bank_transaction_id' => 'required|string',
+            'amount'              => 'required|numeric|min:0.01',
+            'bank_name'           => 'nullable|string',
+        ]);
+
+        // Log the change
+        EnrollmentFormHistory::create([
+            'enrollment_form_id' => $enrollment->id,
+            'user_id'            => $request->user()->id,
+            'action'             => 'payment_edited',
+            'old_status'         => $enrollment->status,
+            'new_status'         => $enrollment->status,
+            'notes'              => "Pago ID {$payment->id} editado. Anterior: {$payment->amount} (TXN: {$payment->bank_transaction_id})",
+        ]);
+
+        $payment->update($request->only(['bank_transaction_id', 'amount', 'bank_name']));
+
+        // Recalcular saldo
+        $totalPaid = $enrollment->payments()->where('status', 'confirmed')->sum('amount');
+        $enrollment->update([
+            'total_paid' => $totalPaid,
+            'balance_due' => ($enrollment->sale_value ?? 0) - $totalPaid,
+        ]);
+
+        return $this->success($enrollment->fresh(['payments']), 'Pago actualizado correctamente.');
     }
 
     public function destroy(Request $request, $id): JsonResponse

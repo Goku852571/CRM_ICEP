@@ -1,29 +1,52 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Upload, FileText, CreditCard, User, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react';
-import { submitPaymentVoucher, getJefes, Jefe } from '../services/enrollmentService';
+import { submitPaymentVoucher, getJefes, Jefe, EnrollmentForm } from '../services/enrollmentService';
 import { showSuccess, showError } from '@/shared/utils/alerts';
 
 interface Props {
-  enrollmentId: number;
-  studentName: string | null;
+  enrollment: EnrollmentForm;
+  installmentNumber: number;
+  paymentId?: number; // If provided, we are editing an existing payment
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function PaymentVoucherModal({ enrollmentId, studentName, onClose, onSuccess }: Props) {
+export default function PaymentVoucherModal({ enrollment, installmentNumber, paymentId, onClose, onSuccess }: Props) {
   const [jefes, setJefes] = useState<Jefe[]>([]);
   const [selectedJefe, setSelectedJefe] = useState<Jefe | null>(null);
   const [jefeDropdownOpen, setJefeDropdownOpen] = useState(false);
   const [transactionId, setTransactionId] = useState('');
-  const [paymentConcept, setPaymentConcept] = useState('enrollment');
+  const [paymentConcept] = useState(`Cuota ${installmentNumber}`);
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  
+  // New financial states
+  const [amount, setAmount] = useState<string>(enrollment.course?.installment_value ? String(enrollment.course.installment_value) : '');
+  const [bankName, setBankName] = useState<string>(enrollment.bank_name || '');
+  const [saleValue, setSaleValue] = useState<string>(enrollment.course?.enrollment_value ? String(enrollment.course.enrollment_value) : '');
+  const [requiresBilling, setRequiresBilling] = useState<boolean>(false);
+  
+  const isInitialSetup = !enrollment.sale_value && installmentNumber === 1; // First payment defines the sale value
+  
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isEditMode = !!paymentId;
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isEditMode && enrollment.payments) {
+      const p = enrollment.payments.find(p => p.id === paymentId);
+      if (p) {
+        setTransactionId(p.bank_transaction_id);
+        setAmount(String(p.amount));
+        setBankName(p.bank_name || '');
+      }
+    }
+  }, [isEditMode, paymentId, enrollment.payments]);
 
   useEffect(() => {
     getJefes().then(setJefes).catch(console.error);
@@ -52,12 +75,55 @@ export default function PaymentVoucherModal({ enrollmentId, studentName, onClose
     setError(null);
     if (!transactionId.trim()) { setError('Ingresa el número de transacción bancaria.'); return; }
     if (!paymentConcept) { setError('Selecciona el concepto del pago.'); return; }
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) { setError('Ingresa el monto del pago.'); return; }
+    if (!bankName.trim() && isInitialSetup) { setError('El Banco es obligatorio.'); return; }
+    if (isInitialSetup && (!saleValue || isNaN(Number(saleValue)))) { setError('Ingresa el valor de venta total.'); return; }
+    
+    if (isInitialSetup && enrollment.course?.min_price && Number(saleValue) < enrollment.course.min_price) {
+        setError(`El valor de venta no puede ser menor a la Inversión Mínima permitida ($${enrollment.course.min_price}).`); return;
+    }
+
     if (!file) { setError('Debes adjuntar el comprobante de pago.'); return; }
     if (!selectedJefe) { setError('Selecciona el jefe que verificará el pago.'); return; }
 
     setIsSubmitting(true);
+    if (isEditMode) {
+      try {
+        await import('../services/enrollmentService').then(m => m.updateEnrollmentPayment(
+          enrollment.id,
+          paymentId!,
+          {
+            bank_transaction_id: transactionId.trim(),
+            amount: Number(amount),
+            bank_name: bankName.trim() || undefined
+          }
+        ));
+        showSuccess('Pago Actualizado', 'Los datos del pago han sido modificados correctamente.');
+        onSuccess();
+      } catch (err: any) {
+        setError(err?.response?.data?.message || 'Error al actualizar el pago.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     try {
-      await submitPaymentVoucher(enrollmentId, transactionId.trim(), paymentConcept, file, selectedJefe.id);
+      await submitPaymentVoucher(
+        enrollment.id,
+        {
+          bank_transaction_id: transactionId.trim(),
+          payment_concept: paymentConcept,
+          payment_voucher: file!,
+          installment_number: installmentNumber,
+          payment_requested_to: selectedJefe!.id,
+          amount: Number(amount),
+          sale_value: isInitialSetup ? Number(saleValue) : undefined,
+          requires_billing: isInitialSetup ? requiresBilling : undefined,
+          bank_name: bankName.trim() || undefined
+        }
+      );
+
       showSuccess('¡Comprobante enviado!', `El jefe ${selectedJefe.name} recibirá la notificación de verificación.`);
       onSuccess();
     } catch (err: any) {
@@ -81,8 +147,8 @@ export default function PaymentVoucherModal({ enrollmentId, studentName, onClose
               <CreditCard size={24} className="text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-white">Comprobante de Pago</h2>
-              <p className="text-amber-100 text-sm font-medium">{studentName || 'Estudiante'}</p>
+              <h2 className="text-xl font-black text-white">Registrar Cuota {installmentNumber}</h2>
+              <p className="text-amber-100 text-sm font-medium">{enrollment.student_name || 'Estudiante'}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-all">
@@ -118,26 +184,96 @@ export default function PaymentVoucherModal({ enrollmentId, studentName, onClose
             <p className="text-[10px] text-on-surface-variant/40 mt-1 ml-1">Este número debe ser único. Si ya existe en el sistema, no se aceptará.</p>
           </div>
 
-          {/* Concepto de Pago */}
-          <div>
-            <label className="block text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mb-2 ml-1">
-              Concepto del Pago *
-            </label>
-            <div className="relative">
-              <select
-                value={paymentConcept}
-                onChange={e => { setPaymentConcept(e.target.value); setError(null); }}
-                className="w-full h-14 px-4 rounded-2xl border-2 border-outline-variant/20 focus:border-amber-400 outline-none transition-all font-bold text-sm bg-surface-container-lowest appearance-none"
-              >
-                <option value="enrollment">Matrícula</option>
-                <option value="installment_1">Cuota 1</option>
-                <option value="installment_2">Cuota 2</option>
-                <option value="installment_3">Cuota 3</option>
-                <option value="full">Pago Completo</option>
-              </select>
-              <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none" />
+          {/* Concepto de Pago y Monto */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mb-2 ml-1">
+                Concepto del Pago
+              </label>
+              <div className="w-full h-14 px-4 flex items-center rounded-2xl border-2 border-outline-variant/10 bg-surface-container-low font-bold text-sm text-primary">
+                {paymentConcept}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mb-2 ml-1">
+                Monto del Pago *
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-on-surface-variant/40">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amount}
+                  onChange={e => { setAmount(e.target.value); setError(null); }}
+                  placeholder="Ej: 50.00"
+                  className="w-full h-14 pl-8 pr-4 rounded-2xl border-2 border-outline-variant/20 focus:border-amber-400 focus:ring-4 focus:ring-amber-100 outline-none transition-all font-mono font-bold text-sm bg-surface-container-lowest"
+                />
+              </div>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Banco */}
+            <div>
+              <label className="block text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mb-2 ml-1">
+                Banco Emisor del Pago {isInitialSetup && '*'}
+              </label>
+              <input
+                type="text"
+                value={bankName}
+                onChange={e => { setBankName(e.target.value); setError(null); }}
+                placeholder="Ej: Banco Pichincha"
+                className="w-full h-14 px-4 rounded-2xl border-2 border-outline-variant/20 focus:border-amber-400 focus:ring-4 focus:ring-amber-100 outline-none transition-all font-bold text-sm bg-surface-container-lowest"
+              />
+            </div>
+
+            {/* Requires Billing */}
+            {isInitialSetup && (
+              <div>
+                <label className="block text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mb-2 ml-1">
+                  Requerirá Facturación *
+                </label>
+                <div className="relative">
+                  <select
+                    value={requiresBilling ? 'true' : 'false'}
+                    onChange={e => { setRequiresBilling(e.target.value === 'true'); setError(null); }}
+                    className="w-full h-14 px-4 rounded-2xl border-2 border-outline-variant/20 focus:border-amber-400 outline-none transition-all font-bold text-sm bg-surface-container-lowest appearance-none"
+                  >
+                    <option value="false">NO (Solo Recibo)</option>
+                    <option value="true">SÍ (Recordar Facturar)</option>
+                  </select>
+                  <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Valor de Venta (Solo Inicial) */}
+          {isInitialSetup && (
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 shadow-sm animate-in zoom-in-95">
+              <label className="block text-[10px] font-black text-amber-800 uppercase tracking-widest mb-2 ml-1">
+                Valor Total de Venta de Matrícula *
+              </label>
+              <div className="relative mb-2">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-amber-600/50">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={saleValue}
+                  onChange={e => { setSaleValue(e.target.value); setError(null); }}
+                  placeholder="Ej: 500.00"
+                  className="w-full h-16 pl-9 pr-4 rounded-2xl border-2 border-amber-300 focus:border-amber-500 focus:ring-4 focus:ring-amber-200 outline-none transition-all font-mono font-black text-lg bg-surface-container-lowest text-amber-900"
+                />
+              </div>
+              <div className="flex items-start gap-2 bg-white/50 p-2 rounded-xl border border-amber-200/50">
+               <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+               <p className="text-[10px] text-amber-800 font-medium">Este valor se registrará como el total del acuerdo. No podrá ser menor al precio de Inversión Mínima definido para este curso.</p>
+              </div>
+            </div>
+          )}
 
           {/* Zona de subida de archivo */}
           <div>

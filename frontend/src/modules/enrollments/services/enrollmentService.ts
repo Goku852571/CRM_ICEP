@@ -29,10 +29,26 @@ export interface EnrollmentForm {
   total_paid: number;
   balance_due: number | null;
   advisor?: { id: number; name: string };
-  course?: { id: number; name: string; code?: string; enrollment_value?: number; installments_count?: number; installment_value?: number };
+  course?: { id: number; name: string; code?: string; enrollment_value?: number; installments_count?: number; installment_value?: number; min_price?: number };
   histories?: any[];
   paymentRequestedTo?: { id: number; name: string; avatar?: string | null };
   paymentConfirmedBy?: { id: number; name: string; avatar?: string | null };
+  payments?: {
+    id: number;
+    amount: number;
+    bank_transaction_id: string;
+    payment_voucher_path: string;
+    payment_concept: string;
+    bank_name: string;
+    status: string;
+    payment_requested_to: number | null;
+    payment_confirmed_by: number | null;
+    payment_confirmed_at: string | null;
+    created_at: string;
+    installment_number: number;
+    paymentConfirmedBy?: { id: number; name: string };
+    paymentRequestedTo?: { id: number; name: string };
+  }[];
 }
 
 export interface AuditSummary {
@@ -51,6 +67,7 @@ export interface Course {
   enrollment_value?: number;
   installments_count?: number;
   installment_value?: number;
+  min_price?: number;
 }
 
 export interface Jefe {
@@ -99,19 +116,39 @@ export const getJefes = async (): Promise<Jefe[]> => {
   return response.data.data;
 };
 
+export interface PaymentUpdatePayload {
+  bank_transaction_id: string;
+  amount: number;
+  bank_name?: string;
+}
+
+
 /** Asesor sube comprobante de pago */
 export const submitPaymentVoucher = async (
   enrollmentId: number,
-  bankTransactionId: string,
-  paymentConcept: string,
-  voucherFile: File,
-  paymentRequestedTo: number
+  payload: {
+    bank_transaction_id: string;
+    payment_concept: string;
+    payment_voucher: File;
+    installment_number: number;
+    payment_requested_to: number;
+    amount: number;
+    sale_value?: number;
+    requires_billing?: boolean;
+    bank_name?: string;
+  }
 ) => {
   const formData = new FormData();
-  formData.append('bank_transaction_id', bankTransactionId);
-  formData.append('payment_concept', paymentConcept);
-  formData.append('payment_voucher', voucherFile);
-  formData.append('payment_requested_to', String(paymentRequestedTo));
+  formData.append('bank_transaction_id', payload.bank_transaction_id);
+  formData.append('payment_concept', payload.payment_concept);
+  formData.append('payment_voucher', payload.payment_voucher);
+  formData.append('installment_number', payload.installment_number.toString());
+  formData.append('payment_requested_to', payload.payment_requested_to.toString());
+  formData.append('amount', String(payload.amount));
+  if (payload.sale_value !== undefined && payload.sale_value !== null) formData.append('sale_value', String(payload.sale_value));
+  if (payload.requires_billing !== undefined) formData.append('requires_billing', payload.requires_billing ? '1' : '0');
+  if (payload.bank_name) formData.append('bank_name', payload.bank_name);
+
   const response = await api.post(`/enrollments/${enrollmentId}/payment`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
@@ -127,6 +164,13 @@ export const confirmPayment = async (
   const response = await api.post(`/enrollments/${enrollmentId}/confirm-payment`, { action, notes });
   return response.data;
 };
+
+/** Actualizar datos de un pago confirmado */
+export const updateEnrollmentPayment = async (enrollmentId: number, paymentId: number, payload: PaymentUpdatePayload) => {
+  const response = await api.patch(`/enrollments/${enrollmentId}/payments/${paymentId}`, payload);
+  return response.data;
+};
+
 
 // ── AUDITORÍA FINANCIERA ─────────────────────────────────────────────────────
 

@@ -34,6 +34,8 @@ export default function NotificationBell() {
         navigate('/tickets', { state: { selectedTicketId: ticket_id } });
         break;
       case 'enrollment_completed':
+      case 'enrollment_requested':
+      case 'enrollment_approved':
       case 'payment_requested':
       case 'payment_confirmed':
         navigate('/enrollments', { state: { selectedEnrollmentId: enrollment_id } });
@@ -42,6 +44,7 @@ export default function NotificationBell() {
         navigate('/calendar');
         break;
       case 'lead_reminder':
+      case 'stalled_lead':
         navigate('/leads', { state: { selectedLeadId: lead_id } });
         break;
     }
