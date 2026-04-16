@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getTicket, updateTicketStatus, replyToTicket, Ticket, History, TicketReply, TicketResource } from '../services/ticketService';
 import { X, Clock, User, AlertCircle, FileText, Activity, Paperclip, Send, File, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/shared/hooks/useAuth';
+import { showError } from '@/shared/utils/alerts';
 
 interface Props {
   ticketId: number;
@@ -68,7 +69,7 @@ export default function TicketDetailModal({ ticketId, onClose, onUpdate }: Props
 
   const handleStatusChange = async (newStatus: string) => {
     if (!statusReason) {
-      alert('Debes ingresar un motivo para el cambio de estado');
+      showError('Atención', 'Debes ingresar un motivo para el cambio de estado');
       return;
     }
     
@@ -81,7 +82,7 @@ export default function TicketDetailModal({ ticketId, onClose, onUpdate }: Props
       onUpdate();
       await fetchTicket();
     } catch (error) {
-      alert('Error al cambiar el estado');
+      showError('Error', 'No se pudo cambiar el estado');
     }
   };
 
@@ -108,7 +109,7 @@ export default function TicketDetailModal({ ticketId, onClose, onUpdate }: Props
       onUpdate();
 
     } catch (error) {
-      alert('Error al enviar la respuesta');
+      showError('Error', 'No se pudo enviar la respuesta');
     } finally {
       setSendingReply(false);
     }

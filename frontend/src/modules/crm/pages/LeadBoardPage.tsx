@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable, DropResult, DragUpdate } from '@hello-pangea/dnd';
 import { 
   Plus, Search, Filter, Phone, Mail, Clock, 
   MapPin, CheckCircle2, ChevronRight, XCircle, Tag, Building2, User,
-  DownloadCloud
+  DownloadCloud, Settings2
 } from 'lucide-react';
 import { getLeads, updateLeadStatus, Lead } from '../services/leadService';
 import LeadDetailModal from '../components/LeadDetailModal';
 import ImportLeadsModal from '../components/ImportLeadsModal';
 import LeadFormModal from '../components/LeadFormModal';
+import LeadSweepManagerModal from '../components/LeadSweepManagerModal';
 import { showSuccess, showError } from '@/shared/utils/alerts';
 import { useAuth } from '@/shared/hooks/useAuth';
 import clsx from 'clsx';
@@ -26,6 +28,8 @@ const COLUMNS = [
 
 export default function LeadBoardPage() {
   const { hasPermission, hasRole } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
@@ -34,6 +38,15 @@ export default function LeadBoardPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [showSweepModal, setShowSweepModal] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.selectedLeadId) {
+      setSelectedLeadId(location.state.selectedLeadId);
+      // Clean up state so it doesn't re-trigger on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   // Accordion State
   const [expandedColumns, setExpandedColumns] = useState<string[]>(['new', 'contacted', 'interested']);
@@ -158,6 +171,16 @@ export default function LeadBoardPage() {
                 >
                   <DownloadCloud size={18} />
                   <span className="hidden lg:inline">Importar</span>
+                </button>
+              )}
+
+              {hasRole('admin') && (
+                <button 
+                  onClick={() => setShowSweepModal(true)}
+                  className="flex items-center gap-2 bg-surface-variant text-on-surface-variant px-4 py-2.5 rounded-xl font-bold text-sm hover:shadow-md hover:bg-surface-variant/80 transition-all whitespace-nowrap"
+                >
+                  <Settings2 size={18} />
+                  <span className="hidden lg:inline">Ajustes & Barrido</span>
                 </button>
               )}
 
@@ -419,6 +442,14 @@ export default function LeadBoardPage() {
             setShowLeadForm(false);
             queryClient.invalidateQueries({ queryKey: ['leads'] });
           }}
+        />
+      )}
+
+      {/* Sweep Manager Modal */}
+      {showSweepModal && (
+        <LeadSweepManagerModal
+          onClose={() => setShowSweepModal(false)}
+          onSwept={() => setShowSweepModal(false)}
         />
       )}
     </div>

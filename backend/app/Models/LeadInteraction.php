@@ -15,10 +15,12 @@ class LeadInteraction extends Model
         'result',
         'notes',
         'interacted_at',
+        'reminder_at',
     ];
 
     protected $casts = [
         'interacted_at' => 'datetime',
+        'reminder_at' => 'datetime',
     ];
 
     public function lead()

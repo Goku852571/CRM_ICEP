@@ -4,10 +4,11 @@ export interface LeadInteraction {
   id: number;
   lead_id: number;
   user_id: number;
-  type: 'call' | 'whatsapp' | 'email' | 'meeting';
+  type: 'call' | 'whatsapp' | 'email' | 'meeting' | 'sweep';
   result: 'no_response' | 'interested' | 'call_back' | 'not_interested' | 'sold' | string;
   notes: string | null;
   interacted_at: string;
+  reminder_at: string | null;
   user?: {
     id: number;
     name: string;
@@ -26,6 +27,7 @@ export interface Lead {
   profession: string | null;
   country: string | null;
   source: string;
+  sweep_count: number;
   status: 'new' | 'contacted' | 'interested' | 'following_up' | 'ready_to_close' | 'closed_won' | 'lost';
   course_interest_id: number | null;
   advisor_id: number | null;
@@ -111,4 +113,19 @@ export const downloadLeadTemplate = async () => {
   } catch (error) {
     console.error('Error downloading template:', error);
   }
+};
+
+export const sweepLeads = async (courseId?: number) => {
+  const response = await api.post('/leads/sweep', { course_id: courseId });
+  return response.data;
+};
+
+export const getCrmSettings = async () => {
+  const response = await api.get('/settings/crm');
+  return response.data;
+};
+
+export const updateCrmSettings = async (data: { lead_stale_days: number }) => {
+  const response = await api.patch('/settings/crm', data);
+  return response.data;
 };

@@ -40,6 +40,7 @@ import {
 import clsx from 'clsx';
 import { getSalesDashboard, exportSalesDashboardReport, getAdvisorStats } from '../services/salesDashboardService';
 import { getLeads, getLead, Lead } from '../services/leadService';
+import { showSuccess, showError } from '@/shared/utils/alerts';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -118,8 +119,9 @@ export default function SalesDashboardPage() {
     try {
       setIsExporting(true);
       await exportSalesDashboardReport(period);
+      showSuccess('Reporte Exportado', 'El archivo ha sido generado correctamente.');
     } catch (e) {
-      alert("Error al exportar el reporte.");
+      showError("Error", "No se pudo exportar el reporte.");
     } finally {
       setIsExporting(false);
     }
@@ -712,7 +714,7 @@ export default function SalesDashboardPage() {
               </button>
               <button 
                 onClick={() => {
-                  alert('Plan de Acción aprobado. Notificaciones enviadas al equipo de asesores.');
+                  showSuccess('Plan Aprobado', 'Plan de Acción aprobado. Notificaciones enviadas al equipo de asesores.');
                   setShowActionPlan(false);
                 }}
                 className="bg-primary text-white px-6 py-3 rounded-xl font-bold font-headline shadow-md shadow-primary/20 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all"

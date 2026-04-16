@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { 
-  X, Phone, Mail, MapPin, Tag, Clock, MessageSquare, 
+import {
+  X, Phone, Mail, MapPin, Tag, Clock, MessageSquare,
   PhoneCall, Send, Link2, Copy, CheckCircle, Loader2, User,
-  Calendar, Briefcase, ChevronRight, Activity, Info, Edit
+  Calendar, Briefcase, ChevronRight, Activity, Info, Edit, RefreshCcw
 } from 'lucide-react';
 import { getLead, addLeadInteraction, Lead } from '../services/leadService';
 import { createEnrollment } from '@/modules/enrollments/services/enrollmentService';
@@ -63,6 +63,13 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
   const [isVisible, setIsVisible] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
+  // Reminder State
+  const [reminderType, setReminderType] = useState<'none' | 'specific' | 'duration'>('none');
+  const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('');
+  const [reminderDuration, setReminderDuration] = useState(60); // minutes by default
+  const [reminderUnit, setReminderUnit] = useState<'minutes' | 'hours' | 'days'>('minutes');
+
   useEffect(() => {
     // Animation trigger
     const timer = setTimeout(() => setIsVisible(true), 10);
@@ -94,7 +101,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
   const enrollmentMutation = useMutation({
     mutationFn: () => {
       if (!lead) throw new Error('No lead data');
-      
+
       // Validation before sending to prevent 422
       if (!lead.course_interest_id) {
         throw new Error('Debe asignar un curso de interés al lead antes de generar el link.');
@@ -103,7 +110,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
         throw new Error('El lead no tiene un asesor asignado.');
       }
 
-      return createEnrollment({ 
+      return createEnrollment({
         lead_id: leadId,
         advisor_id: lead.advisor_id,
         course_id: lead.course_interest_id,
@@ -144,10 +151,35 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
 
   const submitInteraction = (e: React.FormEvent) => {
     e.preventDefault();
+
+    let reminder_at = null;
+    if (interactResult === 'call_back') {
+      if (reminderType === 'specific' && reminderDate && reminderTime) {
+        // Construct date in local timezone and convert to UTC for backend
+        const localDate = new Date(`${reminderDate}T${reminderTime}:00`);
+        reminder_at = localDate.toISOString().slice(0, 19).replace('T', ' ');
+      } else if (reminderType === 'duration') {
+        const now = new Date();
+        const future = new Date(now.getTime());
+        if (reminderUnit === 'minutes') future.setMinutes(now.getMinutes() + reminderDuration);
+        if (reminderUnit === 'hours') future.setHours(now.getHours() + reminderDuration);
+        if (reminderUnit === 'days') future.setDate(now.getDate() + reminderDuration);
+
+        // Format to YYYY-MM-DD HH:mm:ss for backend
+        reminder_at = future.toISOString().slice(0, 19).replace('T', ' ');
+      }
+
+      if (!reminder_at) {
+        showError('Recordatorio requerido', 'Debe programar una fecha o duración para el recordatorio.');
+        return;
+      }
+    }
+
     interactionMutation.mutate({
       type: interactType,
       result: interactResult,
       notes: interactNotes,
+      reminder_at,
     });
   };
 
@@ -163,19 +195,19 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
       isVisible ? "opacity-100" : "opacity-0"
     )}>
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
         onClick={handleClose}
       />
-      
+
       {/* Modal Container */}
       <div className={clsx(
         "relative w-full max-w-5xl bg-white rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden transition-all duration-300 transform h-[90vh] md:h-[85vh]",
         isVisible ? "scale-100 translate-y-0" : "scale-95 translate-y-4"
       )}>
-        
+
         {/* Close Button Mobile */}
-        <button 
+        <button
           onClick={handleClose}
           className="md:hidden absolute top-4 right-4 z-10 p-2 bg-white/80 backdrop-blur rounded-full shadow-lg"
         >
@@ -195,12 +227,18 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
               )}>
                 {STATUS_LABELS[lead.status.toLowerCase()] || lead.status}
               </span>
+              {lead.sweep_count > 0 && (
+                <span className="bg-amber-100 text-amber-800 border border-amber-200 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse flex items-center gap-1 shadow-sm">
+                  <RefreshCcw size={10} />
+                  Barrido ({lead.sweep_count})
+                </span>
+              )}
             </div>
-            
+
             <h2 className="text-2xl font-headline font-bold text-slate-900 leading-tight mb-2">
               {lead.name}
             </h2>
-            
+
             {lead.advisor?.name && (
               <div className="flex items-center gap-2 text-slate-500 text-sm">
                 <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-bold">
@@ -224,7 +262,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                     <p className="text-sm font-bold text-slate-700 truncate">{lead.phone}</p>
                   </div>
                 </a>
-                
+
                 <a href={`mailto:${lead.email}`} className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 hover:border-primary/30 hover:shadow-sm transition-all group">
                   <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
                     <Mail size={14} />
@@ -274,7 +312,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
           {/* Header Action / Close */}
           <div className="hidden md:flex absolute top-6 right-8 z-10 items-center gap-2">
             {!isReadOnly && !isWon && (
-              <button 
+              <button
                 onClick={() => setShowEditModal(true)}
                 className="p-2.5 bg-white text-primary hover:bg-primary hover:text-white rounded-2xl transition-all shadow-sm active:scale-95 border border-primary/20 flex items-center gap-2 px-4 font-bold text-xs"
               >
@@ -282,7 +320,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                 Editar Lead
               </button>
             )}
-            <button 
+            <button
               onClick={handleClose}
               className="p-2.5 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-2xl transition-all shadow-sm active:scale-95"
             >
@@ -292,7 +330,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
 
           {/* Tabs */}
           <div className="flex-none px-8 pt-8 flex items-center gap-8 border-b border-slate-100">
-            <button 
+            <button
               onClick={() => setActiveTab('activity')}
               className={clsx(
                 "pb-4 text-sm font-bold transition-all relative",
@@ -304,7 +342,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full shadow-[0_-4px_10px_rgba(var(--primary-rgb),0.3)]" />
               )}
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('info')}
               className={clsx(
                 "pb-4 text-sm font-bold transition-all relative",
@@ -320,10 +358,10 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
 
           {/* Scrollable Content Area */}
           <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-            
+
             {activeTab === 'activity' ? (
               <div className="max-w-3xl mx-auto space-y-8">
-                
+
                 {/* Sale / Enrollment Alert */}
                 {(isReadyToClose || lead.enrollment) && !isReadOnly && (
                   <section className={clsx(
@@ -331,7 +369,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                     lead.enrollment ? "bg-emerald-50/50 border-emerald-100" : "bg-gradient-to-br from-amber-50 to-orange-50/50 border-orange-100"
                   )}>
                     <div className="absolute -top-12 -right-12 w-24 h-24 bg-white/40 blur-3xl rounded-full" />
-                    
+
                     <div className="flex md:items-center gap-6 relative">
                       <div className={clsx(
                         "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg",
@@ -339,7 +377,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                       )}>
                         {lead.enrollment ? <CheckCircle size={28} /> : <Link2 size={28} />}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <h4 className={clsx(
                           "text-lg font-headline font-bold mb-1",
@@ -351,13 +389,13 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                           "text-sm mb-4 leading-relaxed",
                           lead.enrollment ? "text-emerald-700/80" : "text-orange-700/80"
                         )}>
-                          {lead.enrollment 
-                            ? 'El enlace de matrícula personalizada está activo y pendiente de que el estudiante complete el formulario.' 
+                          {lead.enrollment
+                            ? 'El enlace de matrícula personalizada está activo y pendiente de que el estudiante complete el formulario.'
                             : 'El prospecto está listo para cerrar la venta. Genera un enlace único para que realice su inscripción.'}
                         </p>
-                        
+
                         {!generatedLink && !lead.enrollment ? (
-                          <button 
+                          <button
                             onClick={() => enrollmentMutation.mutate()}
                             disabled={enrollmentMutation.isPending}
                             className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-2xl text-sm font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 disabled:opacity-50 flex items-center gap-2"
@@ -373,12 +411,12 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                             )}>
                               {generatedLink || `${window.location.origin}/enrollment/${lead.enrollment?.uuid}`}
                             </div>
-                            <button 
+                            <button
                               onClick={() => copyToClipboard(generatedLink || `${window.location.origin}/enrollment/${lead.enrollment?.uuid}`)}
                               className={clsx(
                                 "flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-md active:scale-95 shrink-0",
-                                copiedLink 
-                                  ? "bg-emerald-600 text-white" 
+                                copiedLink
+                                  ? "bg-emerald-600 text-white"
                                   : (lead.enrollment ? "bg-emerald-600 text-white" : "bg-orange-600 text-white")
                               )}
                             >
@@ -420,7 +458,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                               <option value="meeting">🤝 Reunión Presencial</option>
                             </select>
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                <ChevronRight size={14} className="rotate-90" />
+                              <ChevronRight size={14} className="rotate-90" />
                             </div>
                           </div>
                         </div>
@@ -428,7 +466,13 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Estado de la gestión</label>
                           <div className="relative">
                             <select
-                              value={interactResult} onChange={e => setInteractResult(e.target.value)}
+                              value={interactResult}
+                              onChange={e => {
+                                setInteractResult(e.target.value);
+                                if (e.target.value === 'call_back' && reminderType === 'none') {
+                                  setReminderType('duration');
+                                }
+                              }}
                               className="w-full text-xs font-bold bg-white border-none rounded-2xl p-3.5 focus:ring-2 focus:ring-primary shadow-sm appearance-none outline-none"
                             >
                               <option value="no_response">{INTERACTION_LABELS.no_response}</option>
@@ -437,11 +481,86 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                               <option value="not_interested">{INTERACTION_LABELS.not_interested}</option>
                             </select>
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                <ChevronRight size={14} className="rotate-90" />
+                              <ChevronRight size={14} className="rotate-90" />
                             </div>
                           </div>
                         </div>
                       </div>
+
+                      {/* Reminder Scheduling (Only if Call Back is selected) */}
+                      {interactResult === 'call_back' && (
+                        <div className="bg-white/60 rounded-3xl p-5 border border-slate-200/50 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="flex items-center gap-3 mb-1">
+                            <Clock size={16} className="text-primary" />
+                            <h4 className="text-xs font-bold text-slate-700">Programar el recordatorio</h4>
+                          </div>
+
+                          <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setReminderType('duration')}
+                              className={clsx(
+                                "flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all",
+                                reminderType === 'duration' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+                              )}
+                            >
+                              Luego de ? tiempo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setReminderType('specific')}
+                              className={clsx(
+                                "flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all",
+                                reminderType === 'specific' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+                              )}
+                            >
+                              Fecha específica
+                            </button>
+                          </div>
+
+                          {reminderType === 'duration' ? (
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="number"
+                                min="1"
+                                value={reminderDuration}
+                                onChange={e => setReminderDuration(parseInt(e.target.value) || 0)}
+                                className="w-full bg-white border-slate-100 rounded-xl p-2.5 text-xs font-bold focus:ring-primary h-10 shadow-sm outline-none"
+                                placeholder="Introduce valor..."
+                              />
+                              <select
+                                value={reminderUnit}
+                                onChange={e => setReminderUnit(e.target.value as any)}
+                                className="w-full bg-white border-slate-100 rounded-xl p-2.5 text-xs font-bold focus:ring-primary h-10 shadow-sm outline-none"
+                              >
+                                <option value="minutes">Minutos</option>
+                                <option value="hours">Horas</option>
+                                <option value="days">Días</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="date"
+                                value={reminderDate}
+                                onChange={e => setReminderDate(e.target.value)}
+                                className="w-full bg-white border-slate-100 rounded-xl p-2.5 text-xs font-bold focus:ring-primary h-10 shadow-sm outline-none"
+                                min={new Date().toISOString().split('T')[0]}
+                              />
+                              <input
+                                type="time"
+                                value={reminderTime}
+                                onChange={e => setReminderTime(e.target.value)}
+                                className="w-full bg-white border-slate-100 rounded-xl p-2.5 text-xs font-bold focus:ring-primary h-10 shadow-sm outline-none"
+                              />
+                            </div>
+                          )}
+
+                          <p className="text-[12px] text-red-400 font-bold italic">
+                            * Se enviará una notificación en el momento programado.
+                          </p>
+                        </div>
+                      )}
 
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Notas de la gestión</label>
@@ -453,12 +572,12 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                       </div>
 
                       <div className="flex justify-end">
-                        <button 
+                        <button
                           type="submit"
                           disabled={interactionMutation.isPending || !interactNotes.trim()}
                           className="bg-primary text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95"
                         >
-                          {interactionMutation.isPending ? 'Guardando...' : 'Guardar Seguimiento'} 
+                          {interactionMutation.isPending ? 'Guardando...' : 'Guardar Seguimiento'}
                           <Send size={14} />
                         </button>
                       </div>
@@ -470,8 +589,8 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                       <Activity size={18} className="text-primary" />
-                       Historial de Actividad
+                      <Activity size={18} className="text-primary" />
+                      Historial de Actividad
                     </h3>
                     <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-3 py-1 rounded-full">
                       {lead.interactions?.length || 0} Eventos
@@ -488,14 +607,35 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                     </div>
                   ) : (
                     <div className="relative space-y-6 before:absolute before:left-6 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                      {lead.interactions.map((interaction) => (
+                      {lead.interactions.map((interaction) => {
+                        if (interaction.type === 'sweep') {
+                          return (
+                            <div key={interaction.id} className="relative py-4 group">
+                               <div className="absolute left-6 top-1/2 w-8 h-px bg-amber-400"></div>
+                               <div className="ml-16 bg-gradient-to-r from-amber-50 to-white p-4 rounded-3xl border border-amber-200/50 shadow-[0_4px_15px_-4px_rgba(251,191,36,0.3)] flex flex-wrap items-center gap-4">
+                                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-inner">
+                                    <RefreshCcw size={18} className="animate-spin-slow" />
+                                  </div>
+                                  <div className="flex-1 min-w-[200px]">
+                                    <h4 className="text-[11px] font-black text-amber-900 uppercase tracking-widest leading-none mb-1">Nuevo Barrido del Sistema</h4>
+                                    <p className="text-xs font-medium text-amber-700/80">{interaction.notes}</p>
+                                  </div>
+                                  <div className="px-3 py-1 bg-white/60 rounded-full text-[10px] font-bold text-amber-600/60 shadow-sm border border-amber-100">
+                                     {new Date(interaction.interacted_at).toLocaleDateString()}
+                                  </div>
+                               </div>
+                            </div>
+                          );
+                        }
+
+                        return (
                         <div key={interaction.id} className="relative flex gap-6 items-start group">
                           {/* Dot/Icon on Timeline */}
                           <div className={clsx(
                             "w-12 h-12 rounded-2xl flex items-center justify-center z-10 shadow-sm transition-transform group-hover:scale-110 shrink-0",
                             interaction.type === 'call' ? "bg-blue-500 text-white" :
-                            interaction.type === 'whatsapp' ? "bg-emerald-500 text-white" :
-                            interaction.type === 'email' ? "bg-purple-500 text-white" : "bg-slate-500 text-white"
+                              interaction.type === 'whatsapp' ? "bg-emerald-500 text-white" :
+                                interaction.type === 'email' ? "bg-purple-500 text-white" : "bg-slate-500 text-white"
                           )}>
                             {interaction.type === 'call' && <PhoneCall size={18} />}
                             {interaction.type === 'whatsapp' && <MessageSquare size={18} />}
@@ -510,7 +650,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                                 <span className={clsx(
                                   "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg",
                                   interaction.result === 'interested' ? "bg-emerald-50 text-emerald-600" :
-                                  interaction.result === 'no_response' ? "bg-slate-100 text-slate-500" : "bg-amber-50 text-amber-600"
+                                    interaction.result === 'no_response' ? "bg-slate-100 text-slate-500" : "bg-amber-50 text-amber-600"
                                 )}>
                                   {INTERACTION_LABELS[interaction.result.toLowerCase()] || interaction.result}
                                 </span>
@@ -525,9 +665,17 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                                 "{interaction.notes}"
                               </p>
                             )}
+
+                            {interaction.reminder_at && (
+                              <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-primary bg-primary/10 w-fit px-3 py-1.5 rounded-xl border border-primary/10">
+                                <Calendar size={12} />
+                                Recordatorio programado para: {new Date(interaction.reminder_at).toLocaleString()}
+                              </div>
+                            )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -538,44 +686,44 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-6">
                     <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Detalles del Sistema</h3>
-                    
+
                     <div className="space-y-4">
                       <div className="p-4 bg-slate-50 rounded-2xl">
-                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Identificador Único</p>
-                         <p className="font-mono text-xs font-bold text-primary">{lead.uuid}</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Identificador Único</p>
+                        <p className="font-mono text-xs font-bold text-primary">{lead.uuid}</p>
                       </div>
 
                       <div className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center">
-                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Origen del Lead</p>
-                            <p className="font-bold text-slate-700 capitalize">{lead.source === 'enrollment_form' ? 'Formulario Web' : lead.source}</p>
-                         </div>
-                         <div className="px-3 py-1 bg-white rounded-xl shadow-sm">
-                            {lead.source === 'enrollment_form' ? <Activity size={16} className="text-primary" /> : <User size={16} className="text-slate-400" />}
-                         </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Origen del Lead</p>
+                          <p className="font-bold text-slate-700 capitalize">{lead.source === 'enrollment_form' ? 'Formulario Web' : lead.source}</p>
+                        </div>
+                        <div className="px-3 py-1 bg-white rounded-xl shadow-sm">
+                          {lead.source === 'enrollment_form' ? <Activity size={16} className="text-primary" /> : <User size={16} className="text-slate-400" />}
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-6">
                     <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Información de Seguimiento</h3>
-                    
-                    <div className="space-y-4">
-                       <div className="p-4 bg-slate-50 rounded-2xl">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Última Actualización</p>
-                          <p className="font-bold text-slate-700">{new Date(lead.updated_at).toLocaleString()}</p>
-                       </div>
 
-                       <div className="border border-slate-100 p-6 rounded-[2rem] flex flex-col items-center text-center">
-                          <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-50 text-indigo-500 flex items-center justify-center mb-4">
-                             <Info size={32} />
-                          </div>
-                          <p className="text-sm font-bold text-slate-800 mb-1">¿Necesitas ayuda con este lead?</p>
-                          <p className="text-xs text-slate-400 mb-4">Contacta con soporte si este registro presenta duplicidad o datos erróneos.</p>
-                          <button className="text-[11px] font-black uppercase tracking-widest text-primary hover:text-primary-dark transition-colors">
-                            Reportar Incidencia
-                          </button>
-                       </div>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-slate-50 rounded-2xl">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Última Actualización</p>
+                        <p className="font-bold text-slate-700">{new Date(lead.updated_at).toLocaleString()}</p>
+                      </div>
+
+                      <div className="border border-slate-100 p-6 rounded-[2rem] flex flex-col items-center text-center">
+                        <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-50 text-indigo-500 flex items-center justify-center mb-4">
+                          <Info size={32} />
+                        </div>
+                        <p className="text-sm font-bold text-slate-800 mb-1">¿Necesitas ayuda con este lead?</p>
+                        <p className="text-xs text-slate-400 mb-4">Contacta con soporte si este registro presenta duplicidad o datos erróneos.</p>
+                        <button className="text-[11px] font-black uppercase tracking-widest text-primary hover:text-primary-dark transition-colors">
+                          Reportar Incidencia
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -586,12 +734,12 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
 
           {/* Footer mobile actions */}
           <div className="md:hidden p-4 border-t border-slate-100 flex gap-3">
-             <button 
-               onClick={handleClose}
-               className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm"
-             >
-               Cerrar
-             </button>
+            <button
+              onClick={handleClose}
+              className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm"
+            >
+              Cerrar
+            </button>
           </div>
         </div>
       </div>

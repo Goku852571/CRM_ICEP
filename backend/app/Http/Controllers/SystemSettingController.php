@@ -37,4 +37,33 @@ class SystemSettingController extends Controller
 
         return response()->json(['message' => 'Configuración de matrícula actualizada exitosamente.']);
     }
+
+    public function getCrmSettings()
+    {
+        $setting = DB::table('system_settings')
+            ->where('key', 'lead_stale_days')
+            ->first();
+            
+        return response()->json([
+            'lead_stale_days' => $setting ? (int)$setting->value : 5,
+        ]);
+    }
+
+    public function updateCrmSettings(Request $request)
+    {
+        $request->validate([
+            'lead_stale_days' => 'required|integer|min:1'
+        ]);
+
+        DB::table('system_settings')
+            ->updateOrInsert(
+                ['key' => 'lead_stale_days'],
+                [
+                    'value' => (string)$request->lead_stale_days,
+                    'updated_at' => now()
+                ]
+            );
+
+        return response()->json(['message' => 'Configuración de CRM actualizada exitosamente.']);
+    }
 }

@@ -190,6 +190,7 @@ class LeadController extends Controller
             'type' => 'required|string', // call, whatsapp, email, meeting
             'result' => 'required|string',
             'notes' => 'nullable|string',
+            'reminder_at' => 'nullable|date',
         ]);
 
         $interaction = \App\Models\LeadInteraction::create([
@@ -198,8 +199,17 @@ class LeadController extends Controller
             'type' => $validated['type'],
             'result' => $validated['result'],
             'notes' => $validated['notes'],
+            'reminder_at' => $validated['reminder_at'] ?? null,
             'interacted_at' => now(),
         ]);
+
+        // If a reminder is set, schedule the notification
+        if ($interaction->reminder_at) {
+            $reminderTime = Carbon::parse($interaction->reminder_at);
+            if ($reminderTime->isFuture()) {
+                $request->user()->notify((new \App\Notifications\LeadReminderNotification($lead, $interaction->notes))->delay($reminderTime));
+            }
+        }
 
         // AUTOMATIC TRANSITION: If lead was 'new', move to 'contacted'
         if ($lead->status === 'new') {
@@ -388,6 +398,46 @@ class LeadController extends Controller
             'imported' => $imported,
             'duplicates' => $duplicates,
             'advisors_used' => $numAdvisors
+        ]);
+    }
+    public function sweepLeads(Request $request)
+    {
+        if (!$request->user()->hasRole('admin')) {
+            return response()->json(['message' => 'No autorizado'], 403);
+        }
+
+        $validated = $request->validate([
+            'course_id' => 'nullable|exists:courses,id'
+        ]);
+
+        $query = \App\Models\Lead::where('status', 'lost');
+
+        if (!empty($validated['course_id'])) {
+            $query->where('course_interest_id', $validated['course_id']);
+        }
+
+        $leads = $query->get();
+        $count = 0;
+
+        foreach ($leads as $lead) {
+            $lead->increment('sweep_count');
+            $lead->update(['status' => 'contacted']);
+
+            \App\Models\LeadInteraction::create([
+                'lead_id' => $lead->id,
+                'user_id' => $request->user()->id,
+                'type' => 'sweep',
+                'result' => 'sweep_triggered',
+                'notes' => 'El lead ha sido revivido por un barrido del sistema.',
+                'interacted_at' => now()
+            ]);
+
+            $count++;
+        }
+
+        return response()->json([
+            'message' => 'Barrido ejecutado exitosamente',
+            'swept_count' => $count
         ]);
     }
 }

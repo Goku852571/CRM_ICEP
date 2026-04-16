@@ -9,7 +9,7 @@ import {
   getEmailTemplates, createEmailTemplate, updateEmailTemplate, 
   deleteEmailTemplate, EmailTemplate 
 } from '../services/emailService';
-import { showSuccess, showError } from '@/shared/utils/alerts';
+import { showSuccess, showError, showConfirmDanger } from '@/shared/utils/alerts';
 import clsx from 'clsx';
 
 export default function EmailTemplatePage() {
@@ -94,7 +94,7 @@ export default function EmailTemplatePage() {
         <div className="flex items-center gap-3 w-full sm:w-auto">
           {isEdit && (
             <button 
-               onClick={() => { if(confirm('¿Seguro?')) deleteMutation.mutate(parseInt(id!)); }}
+               onClick={async () => { if(await showConfirmDanger('¿Eliminar Plantilla?', '¿Estás seguro de que deseas borrar esta plantilla?')) deleteMutation.mutate(parseInt(id!)); }}
                disabled={deleteMutation.isPending}
                className="p-3 bg-error/10 text-error rounded-xl hover:bg-error transition-all hover:text-white"
             >

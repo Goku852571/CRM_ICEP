@@ -11,7 +11,7 @@ import {
   deleteEmailCampaign, deleteEmailTemplate, 
   EmailCampaign, EmailTemplate 
 } from '../services/emailService';
-import { showSuccess, showError } from '@/shared/utils/alerts';
+import { showSuccess, showError, showConfirmDanger } from '@/shared/utils/alerts';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -205,7 +205,7 @@ export default function EmailDashboardPage() {
                       <div className="flex flex-col justify-between items-end">
                          <div className="p-2 bg-surface rounded-2xl border border-outline-variant/10 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                             <button onClick={() => navigate(`/email/campaigns/${cam.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-all"><Eye size={18} /></button>
-                            <button onClick={() => { if(confirm('¿Eliminar campaña?')) deleteCampaignPerm.mutate(cam.id); }} className="p-2 hover:bg-error/10 text-error rounded-xl transition-all"><Trash2 size={18} /></button>
+                            <button onClick={async () => { if(await showConfirmDanger('¿Eliminar campaña?', 'Esta acción no se puede deshacer.')) deleteCampaignPerm.mutate(cam.id); }} className="p-2 hover:bg-error/10 text-error rounded-xl transition-all"><Trash2 size={18} /></button>
                          </div>
                          <button onClick={() => navigate(`/email/campaigns/${cam.id}`)} className="w-10 h-10 rounded-2xl bg-primary text-on-primary shadow-lg shadow-primary/20 flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
                             <ChevronRight size={20} strokeWidth={3} />
@@ -257,7 +257,7 @@ export default function EmailDashboardPage() {
                             <span className="text-[10px] font-bold text-secondary-fixed-variant uppercase tracking-tighter">Por {temp.created_by_user?.name || 'Sistema'}</span>
                             <div className="flex gap-1">
                                <button onClick={() => navigate(`/email/templates/${temp.id}`)} className="p-2 hover:bg-primary/5 text-primary rounded-lg transition-all"><FileText size={16} /></button>
-                               <button onClick={() => { if(confirm('¿Eliminar plantilla?')) deleteTemplatePerm.mutate(temp.id); }} className="p-2 hover:bg-error/5 text-error rounded-lg transition-all"><Trash2 size={16} /></button>
+                               <button onClick={async () => { if(await showConfirmDanger('¿Eliminar plantilla?', 'Esta acción no se puede deshacer.')) deleteTemplatePerm.mutate(temp.id); }} className="p-2 hover:bg-error/5 text-error rounded-lg transition-all"><Trash2 size={16} /></button>
                             </div>
                          </div>
                       </div>

@@ -11,7 +11,7 @@ import {
    sendEmailCampaign, previewRecipients, EmailCampaign, EmailTemplate
 } from '../services/emailService';
 import { getCourses, Course } from '@/modules/enrollments/services/enrollmentService';
-import { showSuccess, showError } from '@/shared/utils/alerts';
+import { showSuccess, showError, showConfirm } from '@/shared/utils/alerts';
 import clsx from 'clsx';
 
 export default function EmailCampaignPage() {
@@ -101,9 +101,13 @@ export default function EmailCampaignPage() {
       saveMutation.mutate(form);
    };
 
-   const handleSend = () => {
+   const handleSend = async () => {
       if (!isEdit) return showError('Atención', 'Primero guarda el borrador antes de enviar.');
-      if (confirm('¿Seguro que deseas iniciar el envío masivo? Esta acción no se puede deshacer.')) {
+      const confirmed = await showConfirm(
+         '¿Iniciar Envío?',
+         '¿Seguro que deseas iniciar el envío masivo? Esta acción no se puede deshacer.'
+      );
+      if (confirmed) {
          sendMutation.mutate(parseInt(id!));
       }
    };

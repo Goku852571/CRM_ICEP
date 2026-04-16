@@ -73,6 +73,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/leads/stats', [\App\Http\Controllers\LeadController::class, 'stats']);
         Route::get('/leads/template/download', [\App\Http\Controllers\LeadController::class, 'downloadTemplate']);
         Route::post('/leads/import', [\App\Http\Controllers\LeadController::class, 'import']);
+        Route::post('/leads/sweep', [\App\Http\Controllers\LeadController::class, 'sweepLeads']);
         Route::apiResource('leads', \App\Http\Controllers\LeadController::class);
         Route::patch('/leads/{lead}/status', [\App\Http\Controllers\LeadController::class, 'updateStatus']);
         Route::post('/leads/{lead}/interactions', [\App\Http\Controllers\LeadController::class, 'addInteraction']);
@@ -135,6 +136,8 @@ Route::prefix('v1')->group(function () {
         // Configuración del Sistema
         Route::middleware('role:admin')->group(function () {
             Route::patch('/system/settings/enrollment', [\App\Http\Controllers\SystemSettingController::class, 'updateEnrollmentSetting']);
+            Route::get('/settings/crm', [\App\Http\Controllers\SystemSettingController::class, 'getCrmSettings']);
+            Route::patch('/settings/crm', [\App\Http\Controllers\SystemSettingController::class, 'updateCrmSettings']);
         });
     });
 });
