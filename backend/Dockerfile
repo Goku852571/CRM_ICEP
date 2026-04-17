@@ -38,8 +38,8 @@ RUN composer install --no-interaction --optimize-autoloader --no-dev
 COPY .docker/nginx/default.conf /etc/nginx/sites-available/default
 RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
-# Expose port 80
-EXPOSE 80
+# Expose port 10000
+EXPOSE 10000
 
 # Entrypoint script to run migrations and start nginx/fpm
 COPY .docker/entrypoint.sh /usr/local/bin/entrypoint.sh

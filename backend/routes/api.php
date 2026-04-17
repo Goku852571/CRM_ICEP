@@ -8,6 +8,11 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SystemOptionController;
 
 Route::prefix('v1')->group(function () {
+    // Health check for Render
+    Route::get('/health', function () {
+        return response()->json(['status' => 'ok']);
+    });
+
     // Rutas públicas de Autenticación
     Route::post('/auth/login', [AuthController::class, 'login']);
 
