@@ -12,10 +12,9 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# Run migrations (Optional: decide if you want this every time)
-# For Render, it's often better to run this manually or in a build step,
-# but having it here with --force is common for single-instance setups.
+# Run migrations and seeders
 php artisan migrate --force
+php artisan db:seed --force
 
 # Start PHP-FPM in background
 php-fpm -D
