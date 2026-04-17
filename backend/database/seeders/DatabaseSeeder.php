@@ -79,7 +79,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Create initial admin user
-        $user = User::factory()->create([
+        $user = User::create([
             'name' => 'Super Administrador',
             'email' => 'admin@icep.com',
             'password' => bcrypt('1234'),
