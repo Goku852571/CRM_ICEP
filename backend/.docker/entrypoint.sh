@@ -7,6 +7,7 @@ if [ -z "$APP_KEY" ]; then
 fi
 
 # Optimization
+export LOG_CHANNEL=stderr
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
