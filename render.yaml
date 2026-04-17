@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: crm-backend
+    env: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /api/v1/health # Ensure you have a health route or change to /
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: mysql
+      - key: FRONTEND_URL
+        sync: false # Set this in dashboard after deploying frontend
