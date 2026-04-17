@@ -15,6 +15,7 @@ import CalendarPage from '@/modules/calendar/pages/CalendarPage';
 import CourseListPage from '@/modules/courses/pages/CourseListPage';
 import ProfilePage from '@/modules/users/pages/ProfilePage';
 import SalesDashboardPage from '@/modules/crm/pages/SalesDashboardPage';
+import SystemSettingsPage from '@/modules/enrollments/pages/SystemSettingsPage';
 
 // Email Module
 import EmailDashboardPage from '@/modules/email/pages/EmailDashboardPage';
@@ -61,6 +62,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="users" element={<UserListPage />} />
             <Route path="tickets" element={<TicketListPage />} />
             <Route path="enrollments" element={<EnrollmentListPage />} />
+            <Route path="settings" element={<SystemSettingsPage />} />
             <Route path="leads" element={<LeadBoardPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="courses" element={<CourseListPage />} />

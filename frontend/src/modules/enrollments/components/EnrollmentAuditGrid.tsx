@@ -173,6 +173,7 @@ export default function EnrollmentAuditGrid() {
   const summary: AuditSummary | undefined = data?.summary;
 
   const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
+  const [voucherPreview, setVoucherPreview] = useState<string | null>(null);
 
   const handleExport = async () => {
     try {
@@ -302,7 +303,7 @@ export default function EnrollmentAuditGrid() {
                         <tr className="border-b border-outline-variant/10 bg-surface-container-low/40">
                           {[
                             'N°', 'Fecha', 'Asesor', 'Estudiante / Ciudad',
-                            'Facturación', 'Banco', 'Concepto',
+                            'Facturación', 'Banco', 'N° Transacción', 'Concepto',
                             'Valor Venta', 'Total Pagado', 'Saldo', 'Estado Global', 'Comprobantes'
                           ].map(h => (
                             <th key={h} className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-on-surface-variant/50 whitespace-nowrap">
@@ -346,6 +347,16 @@ export default function EnrollmentAuditGrid() {
                                 <EditableCell enrollmentId={e.id} field="bank_name" value={e.bank_name} type="text" />
                               </td>
                               <td className="px-4 py-3 align-top">
+                                <div className="flex flex-col gap-1">
+                                  {e.payments?.map(p => (
+                                    <span key={p.id} className="text-[10px] font-mono text-on-surface-variant font-bold bg-surface-container px-1.5 py-0.5 rounded truncate max-w-[120px]" title={p.bank_transaction_id}>
+                                      {p.bank_transaction_id}
+                                    </span>
+                                  ))}
+                                  {(!e.payments || e.payments.length === 0) && <span className="text-gray-300">—</span>}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 align-top">
                                 <div className="text-xs font-bold text-on-surface-variant whitespace-nowrap">{e.payment_concept || '—'}</div>
                               </td>
                               <td className="px-4 py-3 align-top">
@@ -384,9 +395,9 @@ export default function EnrollmentAuditGrid() {
                                         <div className="flex items-center justify-between font-mono text-on-surface-variant/70">
                                           <span>{p.bank_transaction_id}</span>
                                           {p.payment_voucher_path && (
-                                              <a href={`${window.location.origin}/api/v1/storage/${p.payment_voucher_path}`} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                                              <button type="button" onClick={(ev) => { ev.stopPropagation(); setVoucherPreview(`${window.location.origin}/api/v1/storage/${p.payment_voucher_path}`); }} className="text-primary hover:underline flex items-center gap-1 cursor-pointer">
                                                 <Eye size={10} /> PDF/Img
-                                              </a>
+                                              </button>
                                           )}
                                         </div>
                                       </div>
@@ -412,6 +423,26 @@ export default function EnrollmentAuditGrid() {
       <p className="text-[10px] text-on-surface-variant/40 text-center uppercase tracking-widest font-bold">
         Haz clic en cualquier valor subrayado para editarlo directamente. El saldo se recalcula automáticamente.
       </p>
+
+      {voucherPreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setVoucherPreview(null)}>
+          <div className="relative w-full max-w-4xl max-h-[90vh] bg-surface rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 bg-surface-container border-b border-outline-variant/10">
+              <h3 className="font-headline font-black text-primary">Vista Previa de Comprobante</h3>
+              <button type="button" onClick={() => setVoucherPreview(null)} className="p-2 text-on-surface-variant hover:bg-white rounded-xl transition-colors shadow-sm">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-surface-container-lowest">
+              {voucherPreview.toLowerCase().endsWith('.pdf') ? (
+                <iframe src={voucherPreview} className="w-full h-[70vh] rounded-xl border border-outline-variant/10" title="PDF Preview" />
+              ) : (
+                <img src={voucherPreview} alt="Comprobante" className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-lg" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

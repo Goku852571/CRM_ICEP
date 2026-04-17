@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SystemOptionController;
 
 Route::prefix('v1')->group(function () {
     // Rutas públicas de Autenticación
@@ -52,6 +53,8 @@ Route::prefix('v1')->group(function () {
         // Áreas y Cursos Generales
         Route::get('/areas', [\App\Http\Controllers\AreaController::class, 'index']);
         Route::get('/courses', [\App\Http\Controllers\CourseController::class, 'index']);
+        Route::get('/system/options', [SystemOptionController::class, 'index']);
+        Route::get('/system/options/grouped', [SystemOptionController::class, 'grouped']);
         
         // Tickets
         Route::post('/tickets/{ticket}/replies', [\App\Http\Controllers\TicketController::class, 'storeReply']);
@@ -139,6 +142,9 @@ Route::prefix('v1')->group(function () {
             Route::patch('/system/settings/enrollment', [\App\Http\Controllers\SystemSettingController::class, 'updateEnrollmentSetting']);
             Route::get('/settings/crm', [\App\Http\Controllers\SystemSettingController::class, 'getCrmSettings']);
             Route::patch('/settings/crm', [\App\Http\Controllers\SystemSettingController::class, 'updateCrmSettings']);
+            
+            // Opciones del Sistema
+            Route::apiResource('system/options', SystemOptionController::class)->except(['index']);
         });
     });
 });

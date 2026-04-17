@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Upload, FileText, CreditCard, User, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react';
 import { submitPaymentVoucher, getJefes, Jefe, EnrollmentForm } from '../services/enrollmentService';
+import { getSystemOptions, SystemOption } from '@/shared/services/systemOptionService';
 import { showSuccess, showError } from '@/shared/utils/alerts';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 
 export default function PaymentVoucherModal({ enrollment, installmentNumber, paymentId, onClose, onSuccess }: Props) {
   const [jefes, setJefes] = useState<Jefe[]>([]);
+  const [banks, setBanks] = useState<SystemOption[]>([]);
   const [selectedJefe, setSelectedJefe] = useState<Jefe | null>(null);
   const [jefeDropdownOpen, setJefeDropdownOpen] = useState(false);
   const [transactionId, setTransactionId] = useState('');
@@ -50,6 +52,7 @@ export default function PaymentVoucherModal({ enrollment, installmentNumber, pay
 
   useEffect(() => {
     getJefes().then(setJefes).catch(console.error);
+    getSystemOptions('banks').then(data => setBanks(data.data || [])).catch(console.error);
   }, []);
 
   const handleFile = (f: File) => {
@@ -220,13 +223,21 @@ export default function PaymentVoucherModal({ enrollment, installmentNumber, pay
               <label className="block text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mb-2 ml-1">
                 Banco Emisor del Pago {isInitialSetup && '*'}
               </label>
-              <input
-                type="text"
-                value={bankName}
-                onChange={e => { setBankName(e.target.value); setError(null); }}
-                placeholder="Ej: Banco Pichincha"
-                className="w-full h-14 px-4 rounded-2xl border-2 border-outline-variant/20 focus:border-amber-400 focus:ring-4 focus:ring-amber-100 outline-none transition-all font-bold text-sm bg-surface-container-lowest"
-              />
+              <div className="relative">
+                <select
+                  value={bankName}
+                  onChange={e => { setBankName(e.target.value); setError(null); }}
+                  className="w-full h-14 px-4 rounded-2xl border-2 border-outline-variant/20 focus:border-amber-400 outline-none transition-all font-bold text-sm bg-surface-container-lowest appearance-none"
+                >
+                  <option value="">Selecciona Banco...</option>
+                  {banks.map(bank => (
+                    <option key={bank.id} value={bank.name}>{bank.name}</option>
+                  ))}
+                  {/* Fallback in case specific manual entry is needed or if list is empty */}
+                  {banks.length === 0 && <option value="Otro">Otro / Manual</option>}
+                </select>
+                <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none" />
+              </div>
             </div>
 
             {/* Requires Billing */}

@@ -13,7 +13,8 @@ import {
   TrendingUp,
   Mail,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Settings2
 } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
 import logo from '@/assets/logo.png';
@@ -154,6 +155,13 @@ export default function AppLayout() {
               <FileText size={20} className="shrink-0" />
               {!isCollapsed && <span className="animate-in fade-in slide-in-from-left-4 duration-500 whitespace-nowrap">Matrículas</span>}
             </NavLink>
+
+            {hasRole('admin') && (
+              <NavLink to="/settings" className={navItemClass} title={isCollapsed ? "Configuraciones" : ""}>
+                <Settings2 size={20} className="shrink-0" />
+                {!isCollapsed && <span className="animate-in fade-in slide-in-from-left-4 duration-500 whitespace-nowrap">Configuraciones</span>}
+              </NavLink>
+            )}
 
             <NavLink to="/calendar" className={navItemClass} title={isCollapsed ? "Calendario Institucional" : ""}>
               <Calendar size={20} className="shrink-0" />
