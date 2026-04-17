@@ -231,7 +231,7 @@ export default function PaymentVoucherModal({ enrollment, installmentNumber, pay
                 >
                   <option value="">Selecciona Banco...</option>
                   {banks.map(bank => (
-                    <option key={bank.id} value={bank.name}>{bank.name}</option>
+                    <option key={bank.id} value={bank.label}>{bank.label}</option>
                   ))}
                   {/* Fallback in case specific manual entry is needed or if list is empty */}
                   {banks.length === 0 && <option value="Otro">Otro / Manual</option>}
