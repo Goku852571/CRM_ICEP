@@ -12,8 +12,8 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# Run fresh migrations and seeders
-php artisan migrate:fresh --seed --force
+# Run only new migrations (SAFE)
+php artisan migrate --force
 
 # Start PHP-FPM in background
 php-fpm -D
