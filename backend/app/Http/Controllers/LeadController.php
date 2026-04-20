@@ -152,6 +152,11 @@ class LeadController extends Controller
             return response()->json(['message' => 'No se puede regresar un contacto a la fase Nuevo.'], 422);
         }
 
+        // PROTECTION: Jumping to 'closed_won' without 'ready_to_close'
+        if (isset($validated['status']) && $validated['status'] === 'closed_won' && $lead->status !== 'ready_to_close') {
+            return response()->json(['message' => 'Un lead debe estar en la fase de Cierre antes de ser marcado como Ganado.'], 422);
+        }
+
         $lead->update($validated);
         return response()->json(['message' => 'Lead updated successfully', 'data' => $lead]);
     }
@@ -171,6 +176,11 @@ class LeadController extends Controller
         // PROTECTION: Leads cannot return to 'new' once they've left it
         if ($lead->status !== 'new' && $validated['status'] === 'new') {
             return response()->json(['message' => 'No se puede regresar un contacto a la fase Nuevo una vez que ha sido procesado.'], 422);
+        }
+
+        // PROTECTION: Jumping to 'closed_won' without 'ready_to_close'
+        if ($validated['status'] === 'closed_won' && $lead->status !== 'ready_to_close') {
+            return response()->json(['message' => 'Un lead debe estar en la fase de Cierre antes de ser marcado como Ganado.'], 422);
         }
 
         $lead->update(['status' => $validated['status']]);
@@ -416,22 +426,32 @@ class LeadController extends Controller
             $query->where('course_interest_id', $validated['course_id']);
         }
 
-        $leads = $query->get();
+        $leadIds = $query->pluck('id');
+
+        if ($leadIds->isEmpty()) {
+            return response()->json([
+                'message' => 'No hay leads encontrados para el barrido.',
+                'swept_count' => 0
+            ]);
+        }
+
+        // Ejecutar actualización masiva (más eficiente y evita el error de stdClass)
+        \App\Models\Lead::whereIn('id', $leadIds)->update([
+            'status' => 'contacted',
+            'sweep_count' => \Illuminate\Support\Facades\DB::raw('sweep_count + 1'),
+            'updated_at' => now()
+        ]);
+
         $count = 0;
-
-        foreach ($leads as $lead) {
-            $lead->increment('sweep_count');
-            $lead->update(['status' => 'contacted']);
-
+        foreach ($leadIds as $id) {
             \App\Models\LeadInteraction::create([
-                'lead_id' => $lead->id,
+                'lead_id' => $id,
                 'user_id' => $request->user()->id,
                 'type' => 'sweep',
                 'result' => 'sweep_triggered',
                 'notes' => 'El lead ha sido revivido por un barrido del sistema.',
                 'interacted_at' => now()
             ]);
-
             $count++;
         }
 

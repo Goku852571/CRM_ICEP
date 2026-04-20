@@ -49,7 +49,7 @@ export default function LeadBoardPage() {
   }, [location.state, navigate, location.pathname]);
 
   // Accordion State
-  const [expandedColumns, setExpandedColumns] = useState<string[]>(['new', 'contacted', 'interested']);
+  const [expandedColumns, setExpandedColumns] = useState<string[]>(['new', 'contacted']);
   const [hoverExpandedColumn, setHoverExpandedColumn] = useState<string | null>(null);
 
   const toggleColumn = (id: string) => {
@@ -60,9 +60,9 @@ export default function LeadBoardPage() {
         return prev.filter(col => col !== id);
       }
       const newExpanded = [...prev, id];
-      // Max 3 columns open at the same time
-      if (newExpanded.length > 3) {
-        return newExpanded.slice(newExpanded.length - 3);
+      // Max 2 columns open at the same time
+      if (newExpanded.length > 2) {
+        return newExpanded.slice(newExpanded.length - 2);
       }
       return newExpanded;
     });
@@ -110,6 +110,12 @@ export default function LeadBoardPage() {
     const lead = leads.find(l => l.id === leadId);
     if (lead && lead.status !== 'new' && newStatus === 'new') {
         showError('Operación no permitida', 'No se puede regresar un contacto a la fase Nuevo.');
+        return;
+    }
+
+    // PROTECTION: UI Check to prevent jumping to 'closed_won' without 'ready_to_close'
+    if (lead && newStatus === 'closed_won' && lead.status !== 'ready_to_close') {
+        showError('Proceso incompleto', 'Un lead debe pasar por la fase de Cierre antes de ser marcado como Ganado.');
         return;
     }
 

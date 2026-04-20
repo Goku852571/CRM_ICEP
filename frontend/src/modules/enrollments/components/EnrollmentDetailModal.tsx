@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getEnrollment, updateEnrollmentStatus, confirmPayment, EnrollmentForm } from '../services/enrollmentService';
 import { X, Clock, User, Link as LinkIcon, AlertCircle, MapPin, CreditCard, Mail, Phone, Calendar, ShieldCheck, CheckCircle2, Zap, Copy, ExternalLink, Upload, ThumbsUp, ThumbsDown, Eye, Edit3 } from 'lucide-react';
 import { useAuth } from '@/shared/hooks/useAuth';
@@ -124,13 +125,14 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
     : null;
 
   if (loading || !enrollment) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    return createPortal(
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
         <div className="bg-white p-8 rounded-2xl flex flex-col items-center gap-4 shadow-2xl">
           <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary/20 border-t-primary" />
           <p className="text-on-surface-variant font-medium text-sm">Cargando expediente...</p>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -138,9 +140,9 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
   const publicLink = `${window.location.origin}/enrollment/${enrollment.uuid}`;
   const statusInfo = StatusMap[status] ?? { label: status, color: 'bg-gray-100 text-gray-800' };
 
-  return (
+  return createPortal(
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
         <div
           className="bg-white w-full max-w-3xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300"
           onClick={e => e.stopPropagation()}
@@ -588,7 +590,7 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
 
       {/* Full-screen voucher viewer */}
       {showVoucherPreview && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4" onClick={() => setShowVoucherPreview(null)}>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-4" onClick={() => setShowVoucherPreview(null)}>
           {showVoucherPreview.endsWith('.pdf') ? (
             <iframe src={showVoucherPreview} className="w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl" />
           ) : (
@@ -599,6 +601,7 @@ export default function EnrollmentDetailModal({ enrollmentId, onClose, onUpdate 
           </button>
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 }

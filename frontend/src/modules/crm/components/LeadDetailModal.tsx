@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   X, Phone, Mail, MapPin, Tag, Clock, MessageSquare,
   PhoneCall, Send, Link2, Copy, CheckCircle, Loader2, User,
-  Calendar, Briefcase, ChevronRight, Activity, Info, Edit, RefreshCcw
+  Calendar, Briefcase, ChevronRight, Activity, Info, Edit, RefreshCcw,
+  FileText, ShieldCheck, ExternalLink
 } from 'lucide-react';
 import { getLead, addLeadInteraction, Lead } from '../services/leadService';
 import { createEnrollment } from '@/modules/enrollments/services/enrollmentService';
+import EnrollmentDetailModal from '@/modules/enrollments/components/EnrollmentDetailModal';
 import LeadFormModal from './LeadFormModal';
 import { useAuth } from '@/shared/hooks/useAuth';
 import clsx from 'clsx';
@@ -54,7 +57,8 @@ const statusColors: Record<string, string> = {
 
 export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
   const { user, hasRole } = useAuth();
-  const [activeTab, setActiveTab] = useState<'activity' | 'info'>('activity');
+  const [activeTab, setActiveTab] = useState<'activity' | 'info' | 'enrollment'>('activity');
+  const [showEnrollmentModal, setShowEnrollmentModal] = useState(false);
   const [interactType, setInteractType] = useState<'call' | 'whatsapp' | 'email' | 'meeting'>('call');
   const [interactResult, setInteractResult] = useState('no_response');
   const [interactNotes, setInteractNotes] = useState('');
@@ -84,6 +88,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
   const { data: lead, isLoading, refetch } = useQuery({
     queryKey: ['lead', leadId],
     queryFn: () => getLead(leadId).then(res => res.data as Lead),
+    refetchInterval: 15000,
   });
 
   const interactionMutation = useMutation({
@@ -189,7 +194,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  return (
+  return createPortal(
     <div className={clsx(
       "fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-300 overflow-y-auto custom-scrollbar",
       isVisible ? "opacity-100" : "opacity-0"
@@ -329,11 +334,11 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
           </div>
 
           {/* Tabs */}
-          <div className="flex-none px-8 pt-8 flex items-center gap-8 border-b border-slate-100">
+          <div className="flex-none px-8 pt-8 flex items-center gap-6 border-b border-slate-100 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('activity')}
               className={clsx(
-                "pb-4 text-sm font-bold transition-all relative",
+                "pb-4 text-sm font-bold transition-all relative whitespace-nowrap flex-shrink-0",
                 activeTab === 'activity' ? "text-primary" : "text-slate-400 hover:text-slate-600"
               )}
             >
@@ -345,7 +350,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
             <button
               onClick={() => setActiveTab('info')}
               className={clsx(
-                "pb-4 text-sm font-bold transition-all relative",
+                "pb-4 text-sm font-bold transition-all relative whitespace-nowrap flex-shrink-0",
                 activeTab === 'info' ? "text-primary" : "text-slate-400 hover:text-slate-600"
               )}
             >
@@ -354,6 +359,24 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full shadow-[0_-4px_10px_rgba(var(--primary-rgb),0.3)]" />
               )}
             </button>
+            {lead.enrollment && (
+              <button
+                onClick={() => setActiveTab('enrollment')}
+                className={clsx(
+                  "pb-4 text-sm font-bold transition-all relative whitespace-nowrap flex-shrink-0 flex items-center gap-1.5",
+                  activeTab === 'enrollment' ? "text-emerald-600" : "text-slate-400 hover:text-emerald-600"
+                )}
+              >
+                <FileText size={14} />
+                Expediente de Matrícula
+                <span className="ml-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black rounded-full uppercase tracking-wider">
+                  Activo
+                </span>
+                {activeTab === 'enrollment' && (
+                  <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-t-full" />
+                )}
+              </button>
+            )}
           </div>
 
           {/* Scrollable Content Area */}
@@ -363,38 +386,69 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
               <div className="max-w-3xl mx-auto space-y-8">
 
                 {/* Sale / Enrollment Alert */}
-                {(isReadyToClose || lead.enrollment) && !isReadOnly && (
+                {(isReadyToClose || lead.enrollment) && !isReadOnly && (() => {
+                  // Determine state of enrollment card
+                  const enrollment = lead.enrollment;
+                  const enrollmentStatus = enrollment?.status;
+                  const isCompleted = enrollmentStatus && !['pending_send', 'sent'].includes(enrollmentStatus);
+                  const isApproved = enrollmentStatus === 'approved';
+                  const isPending = !enrollment || ['pending_send', 'sent'].includes(enrollmentStatus || '');
+
+                  // Color scheme based on enrollment progress
+                  const colorScheme = isApproved
+                    ? { bg: 'bg-blue-50/50', border: 'border-blue-100', icon: 'bg-blue-600 text-white', title: 'text-blue-900', text: 'text-blue-700/80', linkBorder: 'border-blue-200 text-blue-800', btn: 'bg-blue-600 text-white' }
+                    : isCompleted
+                    ? { bg: 'bg-blue-50/50', border: 'border-blue-100', icon: 'bg-blue-500 text-white', title: 'text-blue-900', text: 'text-blue-700/80', linkBorder: 'border-blue-200 text-blue-800', btn: 'bg-blue-600 text-white' }
+                    : enrollment
+                    ? { bg: 'bg-emerald-50/50', border: 'border-emerald-100', icon: 'bg-emerald-500 text-white', title: 'text-emerald-900', text: 'text-emerald-700/80', linkBorder: 'border-emerald-200 text-emerald-800', btn: 'bg-emerald-600 text-white' }
+                    : { bg: 'bg-gradient-to-br from-amber-50 to-orange-50/50', border: 'border-orange-100', icon: 'bg-orange-500 text-white', title: 'text-orange-900', text: 'text-orange-700/80', linkBorder: 'border-orange-200 text-orange-800', btn: 'bg-orange-600 text-white' };
+
+                  const statusTitle = isApproved
+                    ? '✓ Estudiante Matriculado'
+                    : isCompleted
+                    ? 'Formulario completado — Procesando'
+                    : enrollment
+                    ? 'Matrícula en curso'
+                    : '¡Casi lo tenemos! Listo para Matrícula';
+
+                  const statusDesc = isApproved
+                    ? 'El proceso de matrícula ha sido aprobado. El estudiante está oficialmente inscrito.'
+                    : isCompleted
+                    ? 'El estudiante completó el formulario. El expediente está en proceso de pago o revisión.'
+                    : enrollment
+                    ? 'El enlace de matrícula personalizada está activo y pendiente de que el estudiante complete el formulario.'
+                    : 'El prospecto está listo para cerrar la venta. Genera un enlace único para que realice su inscripción.';
+
+                  return (
                   <section className={clsx(
                     "rounded-[2rem] p-6 shadow-xl shadow-slate-200/50 border overflow-hidden relative group",
-                    lead.enrollment ? "bg-emerald-50/50 border-emerald-100" : "bg-gradient-to-br from-amber-50 to-orange-50/50 border-orange-100"
+                    colorScheme.bg, colorScheme.border
                   )}>
                     <div className="absolute -top-12 -right-12 w-24 h-24 bg-white/40 blur-3xl rounded-full" />
 
                     <div className="flex md:items-center gap-6 relative">
                       <div className={clsx(
                         "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg",
-                        lead.enrollment ? "bg-emerald-500 text-white" : "bg-orange-500 text-white"
+                        colorScheme.icon
                       )}>
-                        {lead.enrollment ? <CheckCircle size={28} /> : <Link2 size={28} />}
+                        {isApproved ? <ShieldCheck size={28} /> : enrollment ? <CheckCircle size={28} /> : <Link2 size={28} />}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <h4 className={clsx(
                           "text-lg font-headline font-bold mb-1",
-                          lead.enrollment ? "text-emerald-900" : "text-orange-900"
+                          colorScheme.title
                         )}>
-                          {lead.enrollment ? 'Matrícula en curso' : '¡Casi lo tenemos! Listo para Matrícula'}
+                          {statusTitle}
                         </h4>
                         <p className={clsx(
                           "text-sm mb-4 leading-relaxed",
-                          lead.enrollment ? "text-emerald-700/80" : "text-orange-700/80"
+                          colorScheme.text
                         )}>
-                          {lead.enrollment
-                            ? 'El enlace de matrícula personalizada está activo y pendiente de que el estudiante complete el formulario.'
-                            : 'El prospecto está listo para cerrar la venta. Genera un enlace único para que realice su inscripción.'}
+                          {statusDesc}
                         </p>
 
-                        {!generatedLink && !lead.enrollment ? (
+                        {!generatedLink && !enrollment ? (
                           <button
                             onClick={() => enrollmentMutation.mutate()}
                             disabled={enrollmentMutation.isPending}
@@ -407,7 +461,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                             <div className={clsx(
                               "flex-1 p-3 rounded-2xl font-mono text-xs break-all bg-white border border-opacity-50",
-                              lead.enrollment ? "border-emerald-200 text-emerald-800" : "border-orange-200 text-orange-800"
+                              colorScheme.linkBorder
                             )}>
                               {generatedLink || `${window.location.origin}/enrollment/${lead.enrollment?.uuid}`}
                             </div>
@@ -417,7 +471,7 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                                 "flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-md active:scale-95 shrink-0",
                                 copiedLink
                                   ? "bg-emerald-600 text-white"
-                                  : (lead.enrollment ? "bg-emerald-600 text-white" : "bg-orange-600 text-white")
+                                  : colorScheme.btn
                               )}
                             >
                               {copiedLink ? '¡Copiado!' : 'Copiar Link'}
@@ -428,7 +482,8 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                       </div>
                     </div>
                   </section>
-                )}
+                  );
+                })()}
 
                 {/* Form to add interaction */}
                 {!isReadOnly && !isWon && (
@@ -681,6 +736,60 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
                 </div>
 
               </div>
+            ) : activeTab === 'enrollment' && lead.enrollment ? (
+              <div className="max-w-3xl mx-auto">
+                {/* Enrollment summary card */}
+                <div className="bg-gradient-to-br from-emerald-50 to-white rounded-[2rem] border border-emerald-100 p-8 shadow-sm">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg">
+                      <ShieldCheck size={28} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-headline font-bold text-emerald-900">Expediente de Matrícula Vinculado</h3>
+                      <p className="text-sm text-emerald-700/70 font-medium mt-0.5">Este lead tiene un proceso de matrícula activo</p>
+                    </div>
+                  </div>
+
+                  {/* Quick info pills */}
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-sm">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">ID del Expediente</p>
+                      <p className="font-mono font-bold text-primary text-sm">{lead.enrollment.uuid.split('-')[0].toUpperCase()}</p>
+                    </div>
+                    <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-sm">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Estado</p>
+                      <p className={clsx(
+                        "font-bold text-sm capitalize",
+                        lead.enrollment.status === 'approved' ? 'text-emerald-600' :
+                        lead.enrollment.status === 'payment_pending' || lead.enrollment.status === 'in_review' ? 'text-amber-600' :
+                        lead.enrollment.status === 'payment_confirmed' ? 'text-blue-600' :
+                        'text-slate-600'
+                      )}>
+                        {{
+                          pending_send: 'Por Enviar Link',
+                          sent: 'Esperando al Cliente',
+                          completed: 'Formulario Llenado',
+                          payment_pending: 'Verificando Pago ⏳',
+                          payment_confirmed: 'Pago Confirmado ✓',
+                          in_review: 'Matrícula Solicitada ⏳',
+                          approved: 'Matriculado ✓',
+                          incomplete: 'Datos Incompletos',
+                          void: 'Anulado',
+                        }[lead.enrollment.status] ?? lead.enrollment.status}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Open full detail button */}
+                  <button
+                    onClick={() => setShowEnrollmentModal(true)}
+                    className="w-full h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-200 hover:shadow-emerald-300 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
+                  >
+                    <ExternalLink size={18} />
+                    Ver Expediente Completo
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="max-w-3xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -755,6 +864,18 @@ export default function LeadDetailModal({ leadId, onClose, onUpdated }: Props) {
           }}
         />
       )}
-    </div>
+
+      {showEnrollmentModal && lead.enrollment && (
+        <EnrollmentDetailModal
+          enrollmentId={lead.enrollment.id}
+          onClose={() => setShowEnrollmentModal(false)}
+          onUpdate={() => {
+            refetch();
+            onUpdated();
+          }}
+        />
+      )}
+    </div>,
+    document.body
   );
 }
